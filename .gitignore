@@ -1,0 +1,41 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Test results
+TestResults/
+*.trx
+
+# NuGet
+packages/
+*.nupkg
+.nuget/
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local snapshots
+*.zip
+*.7z

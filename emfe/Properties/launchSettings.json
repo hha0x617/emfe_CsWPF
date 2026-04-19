@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "emfe": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
