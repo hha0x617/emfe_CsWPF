@@ -1,0 +1,34 @@
+<Window x:Class="emfe.FramebufferWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Framebuffer" Width="660" Height="520"
+        Background="{DynamicResource ThemeWindowBg}"
+        Foreground="{DynamicResource ThemeForeground}"
+        KeyDown="OnKeyDown" KeyUp="OnKeyUp"
+        Focusable="True">
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource ThemePanelBg}" Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="StatusText" FontSize="12"
+                           Foreground="{DynamicResource ThemeForeground}"/>
+                <TextBlock x:Name="InputStatusText" FontSize="12" Margin="16,0,0,0"
+                           Foreground="{DynamicResource ThemeDimFg}"/>
+            </StackPanel>
+        </Border>
+        <Grid x:Name="FbGrid" Background="Transparent"
+              MouseMove="OnMouseMove"
+              MouseDown="OnMouseDown" MouseUp="OnMouseUp"
+              Cursor="Cross">
+            <Viewbox x:Name="FbViewbox" Stretch="Uniform" StretchDirection="Both"
+                     SnapsToDevicePixels="True"
+                     RenderOptions.BitmapScalingMode="NearestNeighbor">
+                <Image x:Name="FbImage" IsHitTestVisible="False"/>
+            </Viewbox>
+            <TextBlock x:Name="DisabledText" Text="Framebuffer is disabled. Enable it in Settings → Framebuffer."
+                       Visibility="Collapsed"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+                       Foreground="{DynamicResource ThemeDimFg}"/>
+        </Grid>
+    </DockPanel>
+</Window>

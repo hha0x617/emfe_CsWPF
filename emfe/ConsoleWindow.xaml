@@ -1,0 +1,72 @@
+<Window x:Class="emfe.ConsoleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Console (80x25)" Width="700" Height="500"
+        Background="#FF0C0C0C">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBox x:Name="OutputBox" Grid.Row="0"
+                 IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                 FontFamily="Consolas" FontSize="14"
+                 Background="#FF0C0C0C" Foreground="#FF00FF00"
+                 BorderThickness="0" Padding="4"
+                 VerticalScrollBarVisibility="Auto"
+                 PreviewKeyDown="OnKeyInput"
+                 PreviewTextInput="OnTextInput"/>
+
+        <!-- Search bar (hidden by default) -->
+        <Grid x:Name="SearchBar" Grid.Row="1" Background="#FF1E1E1E"
+              Visibility="Collapsed" Height="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" Grid.Column="0"
+                     FontFamily="Consolas" FontSize="13"
+                     Background="#FF2D2D2D" Foreground="#FFCCCCCC"
+                     BorderBrush="#FF3F3F3F" Padding="4,2" Margin="4,2"
+                     VerticalContentAlignment="Center"
+                     KeyDown="OnSearchKeyDown"/>
+            <TextBlock x:Name="SearchStatus" Grid.Column="1"
+                       Foreground="#FF808080" FontSize="12"
+                       VerticalAlignment="Center" Margin="4,0"/>
+            <ToggleButton x:Name="CaseSensitiveToggle" Grid.Column="2"
+                          Content="Aa" FontFamily="Consolas" FontSize="12"
+                          Background="Transparent" BorderThickness="0"
+                          Padding="6,2" Margin="2,0"
+                          ToolTip="Match Case"/>
+            <ToggleButton x:Name="RegexToggle" Grid.Column="3"
+                          Content=".*" FontFamily="Consolas" FontSize="12"
+                          Background="Transparent" BorderThickness="0"
+                          Padding="6,2" Margin="2,0"
+                          ToolTip="Regular Expression"/>
+            <Button x:Name="SearchPrevBtn" Grid.Column="4"
+                    Content="&#x25B2;" FontSize="12"
+                    Background="Transparent" BorderThickness="0"
+                    Padding="6,2" Margin="2,0"
+                    ToolTip="Previous (Shift+F3)"
+                    Click="OnSearchPrev"/>
+            <Button x:Name="SearchNextBtn" Grid.Column="5"
+                    Content="&#x25BC;" FontSize="12"
+                    Background="Transparent" BorderThickness="0"
+                    Padding="6,2" Margin="2,0"
+                    ToolTip="Next (F3)"
+                    Click="OnSearchNext"/>
+            <Button x:Name="SearchCloseBtn" Grid.Column="6"
+                    Content="&#x2715;" FontSize="12"
+                    Background="Transparent" BorderThickness="0"
+                    Padding="6,2" Margin="2,0,4,0"
+                    ToolTip="Close (Esc)"
+                    Click="OnSearchClose"/>
+        </Grid>
+    </Grid>
+</Window>
