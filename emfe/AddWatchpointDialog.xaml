@@ -1,0 +1,51 @@
+<Window x:Class="emfe.AddWatchpointDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add Watchpoint" Width="360" Height="270"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{DynamicResource ThemeWindowBg}"
+        Foreground="{DynamicResource ThemeForeground}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Address (hex):" VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="AddressBox" FontFamily="Consolas"
+                 Margin="0,0,0,8" VerticalContentAlignment="Center"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Size:" VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="SizeBox" SelectedIndex="1" Margin="0,0,0,8">
+            <ComboBoxItem Content="Byte (.B)"/>
+            <ComboBoxItem Content="Word (.W)"/>
+            <ComboBoxItem Content="Long (.L)"/>
+        </ComboBox>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Type:" VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="TypeBox" SelectedIndex="1" Margin="0,0,0,8">
+            <ComboBoxItem Content="Read"/>
+            <ComboBoxItem Content="Write"/>
+            <ComboBoxItem Content="Read+Write"/>
+        </ComboBox>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Condition:" VerticalAlignment="Center" Margin="0,0,0,8"/>
+        <TextBox Grid.Row="3" Grid.Column="1" x:Name="ConditionBox" FontFamily="Consolas"
+                 Margin="0,0,0,8" VerticalContentAlignment="Center"
+                 ToolTip="Optional. Pending plugin API support."/>
+
+        <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="OK" IsDefault="True" Padding="20,4" Margin="0,0,6,0" Click="OnOK"/>
+            <Button Content="Cancel" IsCancel="True" Padding="20,4" Click="OnCancel"/>
+        </StackPanel>
+    </Grid>
+</Window>

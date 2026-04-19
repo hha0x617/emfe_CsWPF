@@ -1,0 +1,27 @@
+<Window x:Class="emfe.BreakpointsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Breakpoints" Width="500" Height="420"
+        Background="{DynamicResource ThemeWindowBg}"
+        Foreground="{DynamicResource ThemeForeground}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ListBox x:Name="EntryList" Grid.Row="0" BorderThickness="0"
+                 Background="{DynamicResource ThemeWindowBg}"
+                 Foreground="{DynamicResource ThemeForeground}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 HorizontalContentAlignment="Stretch"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    Background="{DynamicResource ThemePanelBg}" Height="40">
+            <Button Content="Add Watchpoint..." Padding="10,4" Margin="8,6" Click="OnAddWatchpoint"/>
+            <Button Content="Clear All" Padding="10,4" Margin="0,6,0,6" Click="OnClearAll"/>
+            <Button Content="Close" Padding="10,4" Margin="8,6" Click="OnClose"
+                    HorizontalAlignment="Right"/>
+        </StackPanel>
+    </Grid>
+</Window>
