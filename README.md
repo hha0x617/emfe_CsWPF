@@ -4,21 +4,29 @@
 [![Release](https://img.shields.io/github/v/release/hha0x617/emfe_CsWPF?include_prereleases&sort=semver)](https://github.com/hha0x617/emfe_CsWPF/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-emfe プラグインアーキテクチャの **C# WPF** フロントエンド。
+[日本語 (README_ja.md)](README_ja.md)
 
-[emfe_plugin_mc68030](../emfe_plugins/mc68030/) のようなプラグイン DLL を P/Invoke で動的ロードし、レジスタ・逆アセンブリ・メモリダンプ・コンソールを表示します。
+**C# / WPF** front-end for the emfe plugin architecture.
 
-## 機能
+The host dynamically loads plugin DLLs such as
+[emfe_plugin_mc68030](https://github.com/hha0x617/emfe_plugins/tree/master/mc68030)
+via P/Invoke and surfaces a register panel, disassembly view, memory dump,
+and console window.
 
-- em68030 互換レイアウト ([emfe_WinUI3Cpp](../emfe_WinUI3Cpp/) と同等)
-- レジスタパネル: データ駆動で動的生成 (D0-D7 / A0-A7 の 2列グリッド + Flags + Special/FPU/MMU)
-- 逆アセンブリ: PC行背景ハイライト + ブレークポイントインジケータ
-- メモリダンプ: TextBox 形式 (WPF) + 編集モード
-- 実行制御: Step (F10), Step Over (F11), Step Out (Shift+F11), Run (F5), Stop (Shift+F5), Reset, Full Reset
-- コンソールウィンドウ: 別ウィンドウ、緑/黒配色、自動表示、キー入力
-- 設定ダイアログ: プラグインから取得した setting defs を動的 UI 化
+## Features
 
-## ディレクトリ構造
+- Em68030-style layout (parity with [emfe_WinUI3Cpp](https://github.com/hha0x617/emfe_WinUI3Cpp))
+- Register panel: data-driven dynamic layout (D0–D7 / A0–A7 two-column grid
+  + Flags + Special / FPU / MMU)
+- Disassembly: PC-line background highlight + breakpoint indicator
+- Memory dump: TextBox (WPF) + edit mode
+- Execution control: Step (F10), Step Over (F11), Step Out (Shift+F11),
+  Run (F5), Stop (Shift+F5), Reset, Full Reset
+- Console window: separate window, green/black colour scheme, auto-show,
+  keyboard input
+- Settings dialog: plugin-supplied setting defs rendered as dynamic UI
+
+## Directory layout
 
 ```
 emfe_CsWPF/
@@ -30,43 +38,44 @@ emfe_CsWPF/
     ├── MainWindow.xaml / MainWindow.xaml.cs
     ├── ConsoleWindow.xaml / ConsoleWindow.xaml.cs
     ├── SettingsWindow.xaml / SettingsWindow.xaml.cs
-    ├── PluginInterop.cs    P/Invoke 宣言
-    └── bin/Release/        ビルド成果物
+    ├── PluginInterop.cs    P/Invoke declarations
+    └── bin/Release/        build output
 ```
 
-## 依存関係
+## Dependencies
 
-| 依存先 | 想定パス | 内容 |
-|-------|---------|-----|
-| プラグイン DLL (`emfe_plugin_*.dll`) | `../emfe_plugins/{mc68030,em8,z8000}/build/bin/Release/` (mc6809 は `target/release/`) | csproj の `<None Include>` エントリが自動コピー |
+| Depends on | Expected path | Purpose |
+|-----------|---------------|---------|
+| Plugin DLLs (`emfe_plugin_*.dll`) | `../emfe_plugins/{mc68030,em8,z8000}/build/bin/Release/` (mc6809 at `target/release/`) | The csproj's `<None Include>` entries auto-copy them |
 
-csproj はビルド時に上記から `emfe/bin/Release/net10.0-windows/plugins/` へ
-`emfe_plugin_*.dll` をコピーする。フロントエンドは起動時に
-`<exe_dir>\plugins\emfe_plugin_*.dll` をスキャンして "Switch Plugin"
-ダイアログに列挙する。
+At build time the csproj copies `emfe_plugin_*.dll` from the paths above into
+`emfe/bin/Release/net10.0-windows/plugins/`.  At startup the front-end scans
+`<exe_dir>\plugins\emfe_plugin_*.dll` and lists the results in the
+"Switch Plugin" dialog.
 
-### システム要件
+### System requirements
 
 - Windows 10 / 11
 - .NET 10 SDK
-- Visual Studio 2026 (任意, コマンドラインでも可)
+- Visual Studio 2026 (optional — the command line is sufficient)
 
-## ビルド
+## Build
 
 ```bash
-# 復元 + ビルド
+# Restore + build
 dotnet build emfe_CsWPF.sln -c Release
 ```
 
-Visual Studio 2026 から `emfe_CsWPF.sln` を開いてビルド / F5 デバッグ実行も可能。
+Open `emfe_CsWPF.sln` in Visual Studio 2026 to build / debug (F5) as well.
 
-出力: `emfe/bin/Release/net10.0-windows/emfe.exe`
+Output: `emfe/bin/Release/net10.0-windows/emfe.exe`
 
-## 実行方法
+## Running
 
-### プラグイン DLL の配置
+### Placing plugin DLLs
 
-csproj の自動コピーで通常は不要。開発中に手動配置したい場合:
+Usually not necessary — the csproj copies them automatically.  During
+development you can drop them in manually:
 
 ```bash
 mkdir -p emfe/bin/Release/net10.0-windows/plugins/
@@ -74,39 +83,40 @@ cp ../emfe_plugins/mc68030/build/bin/Release/emfe_plugin_mc68030.dll \
    emfe/bin/Release/net10.0-windows/plugins/
 ```
 
-他プラグイン (em8 / z8000 / mc6809) も同様に `plugins/` へ配置すれば
-Switch Plugin ダイアログから選択できる。
+Other plugins (em8 / z8000 / mc6809) can be placed under `plugins/` the same
+way and will show up in the Switch Plugin dialog.
 
-### 基本操作
+### Basic usage
 
-1. `emfe.exe` を実行
-2. **File → Open ELF...** (Ctrl+E) または **Open S-Record...** (Ctrl+S) でプログラムをロード
-3. **View → Console** でコンソールウィンドウを開く
-4. **Run (F5)** / **Step (F10)** で実行
-5. **逆アセンブリ行のダブルクリック** でブレークポイントをトグル
-6. **Settings → Emulator Settings...** で設定ダイアログを開く
+1. Run `emfe.exe`
+2. **File → Open ELF...** (Ctrl+E) or **Open S-Record...** (Ctrl+S) to load
+   a program
+3. **View → Console** to open the console window
+4. **Run (F5)** / **Step (F10)** to execute
+5. **Double-click a disassembly line** to toggle a breakpoint
+6. **Settings → Emulator Settings...** to open the settings dialog
 
-## P/Invoke パターン
+## P/Invoke pattern
 
-`PluginInterop.cs` で全 emfe API を P/Invoke 宣言。主要な型変換:
+`PluginInterop.cs` declares every emfe API as P/Invoke.  Key type mappings:
 
 | C ABI | C# |
 |-------|-----|
 | `EmfeInstance` | `IntPtr` |
-| `const char*` | `IntPtr` (呼び出し側で `Marshal.PtrToStringAnsi` で読む) |
-| `const char*` 引数 | `string` + `CharSet = CharSet.Ansi` |
-| 構造体配列 | `[In, Out] T[]` |
-| コールバック | `[UnmanagedFunctionPointer(CallingConvention.Cdecl)]` delegate |
+| `const char*` return | `IntPtr` (read with `Marshal.PtrToStringAnsi`) |
+| `const char*` argument | `string` + `CharSet = CharSet.Ansi` |
+| Struct array | `[In, Out] T[]` |
+| Callback | `[UnmanagedFunctionPointer(CallingConvention.Cdecl)]` delegate |
 
-## 関連プロジェクト
+## Related projects
 
-- [emfe_plugins/api](../emfe_plugins/api/) — 共通 C ABI ヘッダ + 開発者ドキュメント
-- [emfe_plugins/mc68030](../emfe_plugins/mc68030/) — MC68030 プラグイン DLL
-- [emfe_plugins/em8](../emfe_plugins/em8/) — EM8 (自作 8-bit 学習用) プラグイン
-- [emfe_plugins/z8000](../emfe_plugins/z8000/) — Zilog Z8000 ファミリープラグイン
-- [emfe_plugins/mc6809](../emfe_plugins/mc6809/) — Motorola MC6809 プラグイン (Rust)
-- [emfe_WinUI3Cpp](../emfe_WinUI3Cpp/) — C++ WinUI3 フロントエンド (同等機能)
+- [emfe_plugins/api](https://github.com/hha0x617/emfe_plugins/tree/master/api) — shared C ABI headers + developer docs
+- [emfe_plugins/mc68030](https://github.com/hha0x617/emfe_plugins/tree/master/mc68030) — MC68030 plugin DLL
+- [emfe_plugins/em8](https://github.com/hha0x617/emfe_plugins/tree/master/em8) — EM8 (custom 8-bit teaching CPU) plugin
+- [emfe_plugins/z8000](https://github.com/hha0x617/emfe_plugins/tree/master/z8000) — Zilog Z8000 family plugin
+- [emfe_plugins/mc6809](https://github.com/hha0x617/emfe_plugins/tree/master/mc6809) — Motorola MC6809 plugin (Rust)
+- [emfe_WinUI3Cpp](https://github.com/hha0x617/emfe_WinUI3Cpp) — C++ WinUI 3 front-end (feature-parity)
 
-## ライセンス
+## License
 
-Apache License 2.0 — 詳細は [LICENSE](LICENSE) を参照
+Apache License 2.0 — see [LICENSE](LICENSE).
