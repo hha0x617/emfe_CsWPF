@@ -44,11 +44,23 @@ emfe_CsWPF/
 
 ## Dependencies
 
-| Depends on | Expected path | Purpose |
-|-----------|---------------|---------|
-| Plugin DLLs (`emfe_plugin_*.dll`) | `../emfe_plugins/{mc68030,em8,z8000}/build/bin/Release/` (mc6809 at `target/release/`) | The csproj's `<None Include>` entries auto-copy them |
+The csproj references the plugin DLLs with paths relative to itself
+(`emfe/emfe.csproj`).  Place [emfe_plugins](https://github.com/hha0x617/emfe_plugins)
+as a sibling directory of this repository, build the plugins, and the csproj
+will auto-copy the resulting DLLs into the publish output:
 
-At build time the csproj copies `emfe_plugin_*.dll` from the paths above into
+| Plugin | Expected path (from `emfe/emfe.csproj`) |
+|--------|-----------------------------------------|
+| `emfe_plugin_mc68030.dll` | `../../emfe_plugins/mc68030/build/bin/Release/` |
+| `emfe_plugin_em8.dll` | `../../emfe_plugins/em8/build/bin/Release/` |
+| `emfe_plugin_z8000.dll` | `../../emfe_plugins/z8000/build/bin/Release/` |
+| `emfe_plugin_mc6809.dll` | `../../emfe_plugins/mc6809/target/release/` |
+
+All `<None Include>` entries guard with `Condition="Exists(...)"`, so a
+missing plugin is silently skipped — the host simply won't see it in the
+Switch Plugin dialog.
+
+At build time the csproj copies the DLLs into
 `emfe/bin/Release/net10.0-windows/plugins/`.  At startup the front-end scans
 `<exe_dir>\plugins\emfe_plugin_*.dll` and lists the results in the
 "Switch Plugin" dialog.
@@ -75,7 +87,9 @@ Output: `emfe/bin/Release/net10.0-windows/emfe.exe`
 ### Placing plugin DLLs
 
 Usually not necessary — the csproj copies them automatically.  During
-development you can drop them in manually:
+development you can drop them in manually (paths below assume the
+`emfe_plugins` sibling-directory layout, run from the `emfe_CsWPF/`
+repo root):
 
 ```bash
 mkdir -p emfe/bin/Release/net10.0-windows/plugins/
