@@ -44,21 +44,21 @@ emfe_CsWPF/
 
 ## Dependencies
 
-The csproj references the plugin DLLs with paths relative to itself
-(`emfe/emfe.csproj`).  Place [emfe_plugins](https://github.com/hha0x617/emfe_plugins)
-as a sibling directory of this repository, build the plugins, and the csproj
-will auto-copy the resulting DLLs into the publish output:
+Place [emfe_plugins](https://github.com/hha0x617/emfe_plugins) as a sibling
+directory of this repository and build the plugins — the csproj references
+the resulting DLLs **relative to itself** (`emfe/emfe.csproj`):
 
-| Plugin | Expected path (from `emfe/emfe.csproj`) |
-|--------|-----------------------------------------|
-| `emfe_plugin_mc68030.dll` | `../../emfe_plugins/mc68030/build/bin/Release/` |
-| `emfe_plugin_em8.dll` | `../../emfe_plugins/em8/build/bin/Release/` |
-| `emfe_plugin_z8000.dll` | `../../emfe_plugins/z8000/build/bin/Release/` |
-| `emfe_plugin_mc6809.dll` | `../../emfe_plugins/mc6809/target/release/` |
+| Depends on | Expected path (from `emfe/emfe.csproj`) | Purpose |
+|-----------|------------------------------------------|---------|
+| `emfe_plugin_mc68030.dll` | `..\..\emfe_plugins\mc68030\build\bin\Release\` | Runtime plugin (copied if built) |
+| `emfe_plugin_em8.dll` | `..\..\emfe_plugins\em8\build\bin\Release\` | Runtime plugin (copied if built) |
+| `emfe_plugin_z8000.dll` | `..\..\emfe_plugins\z8000\build\bin\Release\` | Runtime plugin (copied if built) |
+| `emfe_plugin_mc6809.dll` | `..\..\emfe_plugins\mc6809\target\release\` | Runtime plugin (copied if built) |
 
-All `<None Include>` entries guard with `Condition="Exists(...)"`, so a
-missing plugin is silently skipped — the host simply won't see it in the
-Switch Plugin dialog.
+Each `<None Include>` guards with `Condition="Exists(...)"`, so missing
+plugin DLLs are silently skipped — the host simply won't see them in the
+Switch Plugin dialog.  Build the plugins inside
+`../emfe_plugins/<name>/` first if you want them bundled.
 
 At build time the csproj copies the DLLs into
 `emfe/bin/Release/net10.0-windows/plugins/`.  At startup the front-end scans

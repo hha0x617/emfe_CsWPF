@@ -38,20 +38,23 @@ emfe_CsWPF/
 
 ## 依存関係
 
-csproj 内の `<None Include>` エントリは、**csproj 自身 (`emfe/emfe.csproj`) からの相対パス** でプラグイン DLL を参照している。[emfe_plugins](https://github.com/hha0x617/emfe_plugins)
-を本リポジトリの兄弟ディレクトリに配置し、プラグインをビルドすると、csproj
-が build 成果物を自動でコピーします。
+[emfe_plugins](https://github.com/hha0x617/emfe_plugins) を本リポジトリの
+兄弟ディレクトリに配置してプラグインをビルドすると、csproj が build
+成果物を自動でコピーします。csproj 内の `<None Include>` エントリは、
+**csproj 自身 (`emfe/emfe.csproj`) からの相対パス** でプラグイン DLL を
+参照しています。
 
-| プラグイン | 想定パス (`emfe/emfe.csproj` から見て) |
-|-----------|---------------------------------|
-| `emfe_plugin_mc68030.dll` | `../../emfe_plugins/mc68030/build/bin/Release/` |
-| `emfe_plugin_em8.dll` | `../../emfe_plugins/em8/build/bin/Release/` |
-| `emfe_plugin_z8000.dll` | `../../emfe_plugins/z8000/build/bin/Release/` |
-| `emfe_plugin_mc6809.dll` | `../../emfe_plugins/mc6809/target/release/` |
+| 依存先 | 想定パス (`emfe/emfe.csproj` から見て) | 用途 |
+|-------|----------------------------------------|------|
+| `emfe_plugin_mc68030.dll` | `..\..\emfe_plugins\mc68030\build\bin\Release\` | 実行時プラグイン (ビルドされていれば自動コピー) |
+| `emfe_plugin_em8.dll` | `..\..\emfe_plugins\em8\build\bin\Release\` | 実行時プラグイン (ビルドされていれば自動コピー) |
+| `emfe_plugin_z8000.dll` | `..\..\emfe_plugins\z8000\build\bin\Release\` | 実行時プラグイン (ビルドされていれば自動コピー) |
+| `emfe_plugin_mc6809.dll` | `..\..\emfe_plugins\mc6809\target\release\` | 実行時プラグイン (ビルドされていれば自動コピー) |
 
-すべての `<None Include>` は `Condition="Exists(...)"` で守られているため、
-プラグインが欠けても build は止まらず、ホスト側の Switch Plugin ダイアログに
-該当項目が現れないだけです。
+各 `<None Include>` は `Condition="Exists(...)"` で守られているため、
+プラグイン DLL が欠けても build は止まらず、ホスト側の Switch Plugin ダイアログに
+該当項目が現れないだけです。DLL を同梱したい場合は、
+`../emfe_plugins/<name>/` 側を先にビルドしてください。
 
 csproj はビルド時に上記から `emfe/bin/Release/net10.0-windows/plugins/` へ
 `emfe_plugin_*.dll` をコピーする。フロントエンドは起動時に
