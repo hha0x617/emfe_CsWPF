@@ -1,5 +1,9 @@
 # emfe_CsWPF
 
+[![Build and Release](https://github.com/hha0x617/emfe_CsWPF/actions/workflows/build.yml/badge.svg)](https://github.com/hha0x617/emfe_CsWPF/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/hha0x617/emfe_CsWPF?include_prereleases&sort=semver)](https://github.com/hha0x617/emfe_CsWPF/releases)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 emfe プラグインアーキテクチャの **C# WPF** フロントエンド。
 
 [emfe_plugin_mc68030](../emfe_plugins/mc68030/) のようなプラグイン DLL を P/Invoke で動的ロードし、レジスタ・逆アセンブリ・メモリダンプ・コンソールを表示します。
