@@ -14,6 +14,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -53,6 +55,57 @@ public partial class ConsoleWindow : Window
             if (_outputQueue.Count < 65536)
                 _outputQueue.Enqueue(ch);
         }
+    }
+
+    // ----- Context menu: Copy / Paste --------------------------------------
+
+    private CancellationTokenSource? _pasteCts;
+
+    private void OnConsoleMenuCopy(object sender, RoutedEventArgs e)
+    {
+        // Fall back to copying everything visible if the user hasn't selected
+        // a range — otherwise TextBox.Copy would silently no-op and the menu
+        // feels broken.
+        if (OutputBox.SelectionLength > 0)
+            OutputBox.Copy();
+        else if (!string.IsNullOrEmpty(OutputBox.Text))
+            try { Clipboard.SetText(OutputBox.Text); }
+            catch { /* Clipboard access can fail transiently; ignore. */ }
+    }
+
+    private async void OnConsoleMenuPaste(object sender, RoutedEventArgs e)
+    {
+        if (_sendChar == null) return;
+        if (!Clipboard.ContainsText()) return;
+
+        string raw;
+        try { raw = Clipboard.GetText(); }
+        catch { return; }
+        if (string.IsNullOrEmpty(raw)) return;
+
+        // Normalize line endings to LF only (per user convention for the
+        // emulated UART).
+        string normalized = raw.Replace("\r\n", "\n").Replace('\r', '\n');
+
+        // Cancel any in-flight paste so we don't interleave characters.
+        _pasteCts?.Cancel();
+        _pasteCts = new CancellationTokenSource();
+        var ct = _pasteCts.Token;
+
+        try
+        {
+            // Drip-feed characters so the guest UART's receive ring buffer
+            // has room to drain between bytes.  ~1 ms is faster than 9600 bps
+            // (960 chars/s ≈ 1.04 ms/char) but slow enough for the UART
+            // receiver to cope at typical emulated clock rates.
+            foreach (char ch in normalized)
+            {
+                if (ct.IsCancellationRequested) break;
+                _sendChar(ch);
+                await Task.Delay(1, ct);
+            }
+        }
+        catch (TaskCanceledException) { /* paste interrupted — expected */ }
     }
 
     private void OnRenderTick(object? sender, EventArgs e)

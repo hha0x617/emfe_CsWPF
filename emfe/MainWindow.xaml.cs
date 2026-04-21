@@ -29,6 +29,10 @@ public partial class MainWindow : Window
     private readonly List<FlagCheckEntry> _flagEntries = new();
     private readonly Dictionary<uint, bool> _breakpointAddresses = new();
     private readonly List<uint> _disasmAddresses = new();
+    private readonly List<string> _disasmTexts = new();
+    // One-shot execution breakpoints installed by "Run to here".  Removed
+    // automatically when the CPU stops at the target address.
+    private readonly HashSet<uint> _tempBreakpoints = new();
     private uint _memoryAddress;
     private EmfeStateChangeCallback? _stateChangeCb;
     private EmfeConsoleCharCallback? _consoleCharCb;
@@ -362,6 +366,13 @@ public partial class MainWindow : Window
                 _lastStopAddress = (uint)addr;
                 if (state != EmfeState.Running)
                 {
+                    // Clean up any one-shot breakpoint hit by this stop.
+                    if (reason == EmfeStopReason.Breakpoint
+                        && _tempBreakpoints.Remove((uint)addr)
+                        && !_breakpointAddresses.ContainsKey((uint)addr))
+                    {
+                        _plugin?.emfe_remove_breakpoint(_instance, (uint)addr);
+                    }
                     UpdateRegisters();
                     UpdateDisassembly();
                     UpdateMemoryDump(_memoryAddress);
@@ -728,6 +739,7 @@ public partial class MainWindow : Window
 
         DisasmList.Items.Clear();
         _disasmAddresses.Clear();
+        _disasmTexts.Clear();
 
         for (int i = 0; i < count; i++)
         {
@@ -757,6 +769,7 @@ public partial class MainWindow : Window
             Grid.SetColumn(bpIndicator, 0);
 
             string text = $"{addr.ToString(addrFmt)}  {lines[i].RawBytes,-12}  {lines[i].Mnemonic,-8} {lines[i].Operands}";
+            _disasmTexts.Add(text);
             var mainText = new TextBlock
             {
                 Text = text, FontFamily = ConsolasFont, FontSize = 13,
@@ -822,6 +835,132 @@ public partial class MainWindow : Window
         int idx = DisasmList.SelectedIndex;
         if (idx >= 0 && idx < _disasmAddresses.Count)
             ToggleBreakpoint(_disasmAddresses[idx]);
+    }
+
+    // ========================================================================
+    // Disassembly context menu: Cancel / Run to here / Set PC / Copy
+    // ========================================================================
+
+    // Index in _disasmAddresses / _disasmTexts of the row under the cursor
+    // when the context menu was opened.  -1 when nothing was targeted.
+    private int _disasmMenuTargetIndex = -1;
+
+    private void OnDisasmContextOpened(object sender, RoutedEventArgs e)
+    {
+        // Resolve the right-clicked row at menu-open time.  We prefer the
+        // row under the mouse cursor; fall back to the current selection.
+        _disasmMenuTargetIndex = -1;
+        var pos = System.Windows.Input.Mouse.GetPosition(DisasmList);
+        var hit = System.Windows.Media.VisualTreeHelper.HitTest(DisasmList, pos);
+        if (hit?.VisualHit != null)
+        {
+            var item = FindAncestor<System.Windows.Controls.ListBoxItem>(hit.VisualHit);
+            if (item != null)
+                _disasmMenuTargetIndex = DisasmList.ItemContainerGenerator.IndexFromContainer(item);
+        }
+        if (_disasmMenuTargetIndex < 0)
+            _disasmMenuTargetIndex = DisasmList.SelectedIndex;
+
+        bool haveTarget = _disasmMenuTargetIndex >= 0
+                          && _disasmMenuTargetIndex < _disasmAddresses.Count;
+        DisasmMenuRunToHere.IsEnabled = haveTarget && _instance != IntPtr.Zero;
+        DisasmMenuSetPc.IsEnabled     = haveTarget && _instance != IntPtr.Zero;
+        DisasmMenuCopy.IsEnabled      = DisasmList.SelectedItems.Count > 0;
+    }
+
+    private static T? FindAncestor<T>(System.Windows.DependencyObject? start)
+        where T : System.Windows.DependencyObject
+    {
+        while (start != null && start is not T)
+            start = System.Windows.Media.VisualTreeHelper.GetParent(start);
+        return start as T;
+    }
+
+    private void OnDisasmMenuCancel(object sender, RoutedEventArgs e)
+    {
+        // No-op — right-click / Escape already dismisses the menu.  Kept as a
+        // visible entry at the user's request.
+    }
+
+    private void OnDisasmMenuRunToHere(object sender, RoutedEventArgs e)
+    {
+        if (_instance == IntPtr.Zero) return;
+        if (_disasmMenuTargetIndex < 0 || _disasmMenuTargetIndex >= _disasmAddresses.Count) return;
+
+        uint addr = _disasmAddresses[_disasmMenuTargetIndex];
+
+        // If the address already carries a user-added breakpoint (enabled or not),
+        // don't install a one-shot — just run and let the existing BP stop us.
+        // The state-change callback will not remove a user BP because it's
+        // not in _tempBreakpoints.
+        if (!_breakpointAddresses.ContainsKey(addr))
+        {
+            if (_plugin!.emfe_add_breakpoint(_instance, addr) != EmfeResult.OK)
+            {
+                StatusText.Text = $"Failed to add temporary breakpoint at ${addr:X8}";
+                return;
+            }
+            _tempBreakpoints.Add(addr);
+        }
+
+        _plugin!.emfe_run(_instance);
+        UpdateToolbarState();
+        string af = _addrDigits == 4 ? "X4" : "X8";
+        StatusText.Text = $"Running to ${addr.ToString(af)}...";
+    }
+
+    private void OnDisasmMenuSetPc(object sender, RoutedEventArgs e)
+    {
+        if (_instance == IntPtr.Zero) return;
+        if (_disasmMenuTargetIndex < 0 || _disasmMenuTargetIndex >= _disasmAddresses.Count) return;
+
+        uint addr = _disasmAddresses[_disasmMenuTargetIndex];
+        var values = new[] { new EmfeRegValue { reg_id = _pcRegId, u64 = addr } };
+        if (_plugin!.emfe_set_registers(_instance, values, values.Length) != EmfeResult.OK)
+        {
+            StatusText.Text = $"Failed to set PC to ${addr:X8}";
+            return;
+        }
+        UpdateRegisters();
+        UpdateDisassembly();
+        UpdateMemoryDump(_memoryAddress);
+        string af = _addrDigits == 4 ? "X4" : "X8";
+        StatusText.Text = $"PC set to ${addr.ToString(af)}";
+    }
+
+    private void OnDisasmMenuCopy(object sender, RoutedEventArgs e)
+        => CopySelectedDisasmToClipboard();
+
+    private void OnDisasmCopy(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+    {
+        CopySelectedDisasmToClipboard();
+        e.Handled = true;
+    }
+
+    private void CopySelectedDisasmToClipboard()
+    {
+        if (DisasmList.SelectedItems.Count == 0) return;
+
+        // Walk items in visual order so the copied block reads top-to-bottom
+        // regardless of the user's click order.
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < DisasmList.Items.Count; i++)
+        {
+            if (!DisasmList.SelectedItems.Contains(DisasmList.Items[i])) continue;
+            if (i >= _disasmTexts.Count) continue;
+            if (sb.Length > 0) sb.AppendLine();
+            sb.Append(_disasmTexts[i]);
+        }
+        if (sb.Length == 0) return;
+        try
+        {
+            System.Windows.Clipboard.SetText(sb.ToString());
+            StatusText.Text = $"Copied {DisasmList.SelectedItems.Count} line(s) to clipboard";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Copy failed: {ex.Message}";
+        }
     }
 
     // ========================================================================

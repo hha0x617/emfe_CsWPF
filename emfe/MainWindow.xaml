@@ -120,8 +120,32 @@
                         <ListBox x:Name="DisasmList" BorderThickness="0"
                                  FontFamily="Consolas" FontSize="13"
                                  HorizontalContentAlignment="Stretch"
+                                 SelectionMode="Extended"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                 MouseDoubleClick="OnDisasmDoubleClick"/>
+                                 MouseDoubleClick="OnDisasmDoubleClick">
+                            <ListBox.InputBindings>
+                                <KeyBinding Key="C" Modifiers="Control" Command="ApplicationCommands.Copy"/>
+                            </ListBox.InputBindings>
+                            <ListBox.CommandBindings>
+                                <CommandBinding Command="ApplicationCommands.Copy" Executed="OnDisasmCopy"/>
+                            </ListBox.CommandBindings>
+                            <ListBox.ContextMenu>
+                                <ContextMenu Opened="OnDisasmContextOpened">
+                                    <MenuItem Header="キャンセル" Click="OnDisasmMenuCancel"/>
+                                    <Separator/>
+                                    <MenuItem x:Name="DisasmMenuRunToHere"
+                                              Header="ここまで実行"
+                                              Click="OnDisasmMenuRunToHere"/>
+                                    <MenuItem x:Name="DisasmMenuSetPc"
+                                              Header="現在のアドレスを PC に設定"
+                                              Click="OnDisasmMenuSetPc"/>
+                                    <Separator/>
+                                    <MenuItem x:Name="DisasmMenuCopy"
+                                              Header="選択範囲をコピー (Ctrl+C)"
+                                              Click="OnDisasmMenuCopy"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                        </ListBox>
                     </DockPanel>
                 </Border>
 

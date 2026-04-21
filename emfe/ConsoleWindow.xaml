@@ -16,7 +16,18 @@
                  BorderThickness="0" Padding="4"
                  VerticalScrollBarVisibility="Auto"
                  PreviewKeyDown="OnKeyInput"
-                 PreviewTextInput="OnTextInput"/>
+                 PreviewTextInput="OnTextInput">
+            <TextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem x:Name="ConsoleMenuCopy"
+                              Header="コピー (Ctrl+C)"
+                              Click="OnConsoleMenuCopy"/>
+                    <MenuItem x:Name="ConsoleMenuPaste"
+                              Header="ペースト"
+                              Click="OnConsoleMenuPaste"/>
+                </ContextMenu>
+            </TextBox.ContextMenu>
+        </TextBox>
 
         <!-- Search bar (hidden by default) -->
         <Grid x:Name="SearchBar" Grid.Row="1" Background="#FF1E1E1E"
