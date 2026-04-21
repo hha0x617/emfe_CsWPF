@@ -37,4 +37,29 @@
       <Visible>false</Visible>
     </None>
   </ItemGroup>
+
+  <!-- Generate GitVersion.generated.cs with git commit hash and app version.
+       Pattern mirrored from em68030_CsWPF so the main window title can show
+       the commit hash at a glance — critical for telling which build of
+       the host is actually running. -->
+  <Target Name="GenerateGitVersion" BeforeTargets="CoreCompile">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitHash" />
+    </Exec>
+    <Exec Command="git describe --tags --abbrev=0" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true"
+          Condition="'$(AppVersion)' == ''">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitDescribeTag" />
+    </Exec>
+    <PropertyGroup>
+      <GitCommitHash Condition="'$(GitCommitHash)' == ''">unknown</GitCommitHash>
+      <AppVersion Condition="'$(AppVersion)' == '' and '$(GitDescribeTag)' != '' and $(GitDescribeTag.StartsWith('v'))">$(GitDescribeTag.Substring(1))</AppVersion>
+      <AppVersion Condition="'$(AppVersion)' == ''">0.0.0</AppVersion>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)GitVersion.generated.cs"
+                     Lines="namespace emfe { internal static class GitVersion { public const string CommitHash = &quot;$(GitCommitHash)&quot;%3B public const string VersionString = &quot;$(AppVersion)&quot;%3B } }"
+                     Overwrite="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)GitVersion.generated.cs" />
+    </ItemGroup>
+  </Target>
 </Project>

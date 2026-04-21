@@ -73,6 +73,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"emfe - Emulator Frontend [{GitVersion.CommitHash}]";
         Loaded += OnMainWindowLoaded;
 
         CommandBindings.Add(new CommandBinding(RunCommand, (_, _) => OnRun(this, new RoutedEventArgs())));
