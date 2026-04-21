@@ -48,6 +48,25 @@ public partial class MainWindow : Window
     private string? _lastLoadedFilePath;
     private string _lastLoadedFileType = ""; // "elf", "srec", "binary"
 
+    // Periodic MHz/MIPS update while the emulator is running, ported from
+    // emfe_WinUI3Cpp's MainWindow: every ~500ms sample cycle/instruction
+    // counters, compute rate over the interval, and refresh the toolbar
+    // text. Click CyclesText to cycle through three views so all three
+    // fit in the toolbar without overflow:
+    //   0 = Cycles / Instrs
+    //   1 = MHz / MIPS (instantaneous over the last 500 ms)
+    //   2 = avg MHz / MIPS (since the current Run started)
+    private System.Windows.Threading.DispatcherTimer? _statsTimer;
+    private System.Diagnostics.Stopwatch _statsClock = new();
+    private long _statsLastTicks;
+    private long _statsLastCycles;
+    private long _statsLastInstrs;
+    private long _runStartTicks;
+    private long _runStartCycles;
+    private long _runStartInstrs;
+    private double _instMhz, _instMips, _avgMhz, _avgMips;
+    private int _statsViewMode;
+
     private record RegUIEntry(uint RegId, uint BitWidth, EmfeRegType Type, TextBox ValueBox);
     private record FlagCheckEntry(byte BitMask, int FlagIndex, CheckBox CheckBox);
     private uint _pcRegId = 16; // default m68030, updated from plugin register defs
@@ -82,6 +101,84 @@ public partial class MainWindow : Window
         CommandBindings.Add(new CommandBinding(StepOverCommand, (_, _) => OnStepOver(this, new RoutedEventArgs())));
         CommandBindings.Add(new CommandBinding(StepOutCommand, (_, _) => OnStepOut(this, new RoutedEventArgs())));
         CommandBindings.Add(new CommandBinding(LoadElfCommand, (_, _) => OnLoadElf(this, new RoutedEventArgs())));
+
+        StartStatsTimer();
+    }
+
+    private void StartStatsTimer()
+    {
+        if (_statsTimer != null) return;
+        _statsClock.Start();
+        _statsTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _statsTimer.Tick += (_, _) => UpdateStatsDisplay();
+        _statsTimer.Start();
+    }
+
+    private void ResetRunStatsBaseline()
+    {
+        if (_instance == IntPtr.Zero || _plugin == null) return;
+        _statsLastTicks = 0;
+        _runStartTicks = _statsClock.ElapsedTicks;
+        _runStartCycles = _plugin.emfe_get_cycle_count(_instance);
+        _runStartInstrs = _plugin.emfe_get_instruction_count(_instance);
+        _instMhz = _instMips = 0;
+        _avgMhz = _avgMips = 0;
+    }
+
+    private void UpdateStatsDisplay()
+    {
+        if (_instance == IntPtr.Zero || _plugin == null) return;
+
+        // UpdateRegisters() already repaints the toolbar on stop/step/breakpoint.
+        // Only recompute rates while actually executing — otherwise a stale
+        // snapshot would produce nonsense MHz numbers.
+        var state = _plugin.emfe_get_state(_instance);
+        bool running = state == EmfeState.Running;
+
+        long cycles = _plugin.emfe_get_cycle_count(_instance);
+        long instrs = _plugin.emfe_get_instruction_count(_instance);
+        long nowTicks = _statsClock.ElapsedTicks;
+
+        if (running)
+        {
+            if (_statsLastTicks != 0)
+            {
+                double seconds = (nowTicks - _statsLastTicks) / (double)System.Diagnostics.Stopwatch.Frequency;
+                if (seconds >= 0.001)
+                {
+                    _instMhz = (cycles - _statsLastCycles) / seconds / 1_000_000.0;
+                    _instMips = (instrs - _statsLastInstrs) / seconds / 1_000_000.0;
+                }
+            }
+            if (_runStartTicks != 0)
+            {
+                double runSec = (nowTicks - _runStartTicks) / (double)System.Diagnostics.Stopwatch.Frequency;
+                if (runSec >= 0.01)
+                {
+                    _avgMhz = (cycles - _runStartCycles) / runSec / 1_000_000.0;
+                    _avgMips = (instrs - _runStartInstrs) / runSec / 1_000_000.0;
+                }
+            }
+            _statsLastTicks = nowTicks;
+            _statsLastCycles = cycles;
+            _statsLastInstrs = instrs;
+        }
+
+        CyclesText.Text = _statsViewMode switch
+        {
+            1 => $"{_instMhz:F2} MHz ({_instMips:F2} MIPS)",
+            2 => $"avg {_avgMhz:F2} MHz ({_avgMips:F2} MIPS)",
+            _ => $"Cycles: {cycles}  Instrs: {instrs}",
+        };
+    }
+
+    private void OnCyclesTextClicked(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        _statsViewMode = (_statsViewMode + 1) % 3;
+        UpdateStatsDisplay();  // repaint immediately, don't wait for the next tick
     }
 
     private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
@@ -709,10 +806,11 @@ public partial class MainWindow : Window
             entry.ValueBox.Text = text;
         }
 
-        // Cycles display
-        long cycles = _plugin.emfe_get_cycle_count(_instance);
-        long instrs = _plugin.emfe_get_instruction_count(_instance);
-        CyclesText.Text = $"Cycles: {cycles}  Instrs: {instrs}";
+        // Cycles/MHz/MIPS display is driven by the periodic stats timer and
+        // respects the current click-cycled view mode. Invoking it here keeps
+        // the toolbar in sync with the just-updated register state on stop
+        // or step, without overwriting whichever view the user selected.
+        UpdateStatsDisplay();
     }
 
     // ========================================================================
@@ -904,6 +1002,7 @@ public partial class MainWindow : Window
             _tempBreakpoints.Add(addr);
         }
 
+        ResetRunStatsBaseline();
         _plugin!.emfe_run(_instance);
         UpdateToolbarState();
         string af = _addrDigits == 4 ? "X4" : "X8";
@@ -1466,6 +1565,7 @@ public partial class MainWindow : Window
     private void OnRun(object sender, RoutedEventArgs e)
     {
         if (_instance == IntPtr.Zero) return;
+        ResetRunStatsBaseline();
         _plugin.emfe_run(_instance);
         UpdateToolbarState();
         StatusText.Text = "Running...";
@@ -1834,6 +1934,11 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        if (_statsTimer != null)
+        {
+            _statsTimer.Stop();
+            _statsTimer = null;
+        }
         _consoleWindow?.Close();
         if (_instance != IntPtr.Zero && _plugin != null)
         {

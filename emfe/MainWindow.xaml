@@ -79,7 +79,10 @@
             <Button x:Name="BtnFullReset" Content="Full Reset" Style="{StaticResource ToolBarBtnStyle}" Click="OnFullReset"/>
             <Separator/>
             <TextBlock x:Name="CyclesText" Text="Cycles: 0" FontFamily="Consolas" FontSize="13"
-                       VerticalAlignment="Center" Margin="8,0"/>
+                       VerticalAlignment="Center" Margin="8,0"
+                       Background="Transparent" Cursor="Hand"
+                       MouseLeftButtonUp="OnCyclesTextClicked"
+                       ToolTip="Click to cycle Cycles/Instrs → MHz (MIPS) → avg MHz (MIPS)"/>
             <TextBlock x:Name="StopReasonText" Text="" FontFamily="Consolas" FontSize="13"
                        VerticalAlignment="Center" Margin="8,0"
                        Foreground="{DynamicResource ThemeWarningFg}"/>
