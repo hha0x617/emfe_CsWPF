@@ -25,6 +25,10 @@
                     <MenuItem x:Name="ConsoleMenuPaste"
                               Header="Paste"
                               Click="OnConsoleMenuPaste"/>
+                    <Separator/>
+                    <MenuItem x:Name="ConsoleMenuSelectAll"
+                              Header="Select All (Ctrl+A)"
+                              Click="OnConsoleMenuSelectAll"/>
                 </ContextMenu>
             </TextBox.ContextMenu>
         </TextBox>

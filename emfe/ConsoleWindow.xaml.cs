@@ -92,21 +92,34 @@ public partial class ConsoleWindow : Window
         _pasteCts = new CancellationTokenSource();
         var ct = _pasteCts.Token;
 
+        // Burst-feed characters: push up to PasteBurstSize at the machine's
+        // full speed, then yield for 1 ms so the guest CPU's UART ISR can
+        // drain the receive FIFO before the next burst.  64 matches the
+        // 16550 FIFO depth used by the 68030 plugin, giving ~64 chars/ms
+        // (≈ 6 Mbps equivalent) — effectively instant for pasted text.
+        //
+        // TODO: when the plugin ABI gains a console-tx-space query, use
+        // that for real backpressure instead of the fixed burst size.
+        const int PasteBurstSize = 64;
         try
         {
-            // Drip-feed characters so the guest UART's receive ring buffer
-            // has room to drain between bytes.  ~1 ms is faster than 9600 bps
-            // (960 chars/s ≈ 1.04 ms/char) but slow enough for the UART
-            // receiver to cope at typical emulated clock rates.
+            int count = 0;
             foreach (char ch in normalized)
             {
                 if (ct.IsCancellationRequested) break;
                 _sendChar(ch);
-                await Task.Delay(1, ct);
+                if (++count >= PasteBurstSize)
+                {
+                    count = 0;
+                    await Task.Delay(1, ct);
+                }
             }
         }
         catch (TaskCanceledException) { /* paste interrupted — expected */ }
     }
+
+    private void OnConsoleMenuSelectAll(object sender, RoutedEventArgs e)
+        => OutputBox.SelectAll();
 
     private void OnRenderTick(object? sender, EventArgs e)
     {
