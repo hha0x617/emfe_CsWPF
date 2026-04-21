@@ -139,8 +139,17 @@ public partial class ConsoleWindow : Window
     {
         int i = 0;
         int stallMs = 0;                  // how long we've been waiting for space
-        const int Chunk = 64;
+        const int Chunk = 64;             // matches Uart16550 FIFO depth
         const int StallBreakMs = 5000;    // give up if tx_space stays 0 too long
+        // When the plugin reports an effectively-unbounded buffer (Z8530's
+        // plugin-side queue is uncapped, so \c emfe_console_tx_space returns
+        // INT32_MAX), still throttle bursts so the guest's kernel line
+        // discipline has time to drain.  NetBSD's zs driver logs
+        // "zstty0: N ibuf flood" when its input buffer (TTYHOG, typically
+        // 1024 bytes) overflows — that was what dropped the tail of
+        // multi-KB pastes even though host → plugin was lossless.
+        const int UnboundedThreshold = 1024;
+        const int UnboundedBurstPauseMs = 10;  // 64 chars / 10 ms ≈ 6.4 KB/s
         while (i < text.Length)
         {
             if (ct.IsCancellationRequested) return i;
@@ -153,12 +162,19 @@ public partial class ConsoleWindow : Window
                 continue;
             }
             stallMs = 0;
+            bool unbounded = space >= UnboundedThreshold;
             int n = Math.Min(Math.Min(space, Chunk), text.Length - i);
             for (int k = 0; k < n; k++)
                 _sendChar!(text[i + k]);
             i += n;
             report(i);
-            await Task.Yield();
+            // Bounded plugins (Uart16550) already throttle via the FIFO
+            // fill level — just yield.  Unbounded plugins (Z8530) need
+            // an explicit pause to let the guest-kernel ibuf drain.
+            if (unbounded)
+                await Task.Delay(UnboundedBurstPauseMs, ct);
+            else
+                await Task.Yield();
         }
         return i;
     }
