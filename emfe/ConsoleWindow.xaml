@@ -20,10 +20,10 @@
             <TextBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem x:Name="ConsoleMenuCopy"
-                              Header="コピー (Ctrl+C)"
+                              Header="Copy (Ctrl+C)"
                               Click="OnConsoleMenuCopy"/>
                     <MenuItem x:Name="ConsoleMenuPaste"
-                              Header="ペースト"
+                              Header="Paste"
                               Click="OnConsoleMenuPaste"/>
                 </ContextMenu>
             </TextBox.ContextMenu>

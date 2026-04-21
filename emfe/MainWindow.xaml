@@ -131,17 +131,17 @@
                             </ListBox.CommandBindings>
                             <ListBox.ContextMenu>
                                 <ContextMenu Opened="OnDisasmContextOpened">
-                                    <MenuItem Header="キャンセル" Click="OnDisasmMenuCancel"/>
+                                    <MenuItem Header="Cancel" Click="OnDisasmMenuCancel"/>
                                     <Separator/>
                                     <MenuItem x:Name="DisasmMenuRunToHere"
-                                              Header="ここまで実行"
+                                              Header="Run to Here"
                                               Click="OnDisasmMenuRunToHere"/>
                                     <MenuItem x:Name="DisasmMenuSetPc"
-                                              Header="現在のアドレスを PC に設定"
+                                              Header="Set PC to This Address"
                                               Click="OnDisasmMenuSetPc"/>
                                     <Separator/>
                                     <MenuItem x:Name="DisasmMenuCopy"
-                                              Header="選択範囲をコピー (Ctrl+C)"
+                                              Header="Copy Selection (Ctrl+C)"
                                               Click="OnDisasmMenuCopy"/>
                                 </ContextMenu>
                             </ListBox.ContextMenu>
