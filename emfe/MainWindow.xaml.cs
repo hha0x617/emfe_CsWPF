@@ -594,9 +594,21 @@ public partial class MainWindow : Window
             var boardType = Marshal.PtrToStringAnsi(_plugin.emfe_get_setting(_instance, "BoardType"));
             string board = !string.IsNullOrEmpty(boardType) ? boardType : info.BoardName;
             string boardCpu = $"{board} / {info.CpuName}";
+
+            // Append the network mode when the selected board actually has a
+            // network interface. MVME147 has the LANCE; the Generic board has
+            // no network device, so showing "Network: …" there would mislead.
+            string netSuffix = "";
+            if (board == "MVME147")
+            {
+                var netMode = Marshal.PtrToStringAnsi(_plugin.emfe_get_setting(_instance, "NetworkMode"));
+                if (!string.IsNullOrEmpty(netMode))
+                    netSuffix = $" — Network: {netMode}";
+            }
+
             BoardTypeText.Text = !string.IsNullOrEmpty(_loadedPluginStem)
-                ? $"[{_loadedPluginStem}] {boardCpu}"
-                : boardCpu;
+                ? $"[{_loadedPluginStem}] {boardCpu}{netSuffix}"
+                : $"{boardCpu}{netSuffix}";
         }
     }
 
