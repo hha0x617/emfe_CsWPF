@@ -492,26 +492,29 @@ public partial class MainWindow : Window
         // Console char callback
         _consoleCharCb = (IntPtr userData, byte ch) =>
         {
-            var win = _consoleWindow;
-            if (win != null)
+            // This callback fires on the plugin's CPU thread — a native thread
+            // that the CLR has temporarily attached. Touching any UI state
+            // directly (even a thread-safe lock+enqueue in ConsoleWindow) from
+            // that thread has been observed to eventually corrupt CLR-managed
+            // state during boot-time chatter and crash with
+            //   "ExecutionEngineException in unknown module"
+            //   at coreclr.dll with AV 0xC0000005
+            // Match emfe_WinUI3Cpp's policy: enqueue under a MainWindow-owned
+            // lock, kick the Dispatcher, and do every mutation of _consoleWindow
+            // (and the chars it receives) from the UI thread.
+            lock (_pendingConsoleLock)
+                _pendingConsoleChars.Enqueue((char)ch);
+            // Avoid posting one Dispatcher work item per char during floods
+            // (e.g. kernel dmesg) — CheckAccess short-circuits when we happen
+            // to already be on the UI thread, and the drain pulls the whole
+            // queue in one go regardless of how many chars piled up.
+            if (Dispatcher.CheckAccess())
             {
-                win.AppendChar((char)ch);
+                DrainPendingConsoleChars();
             }
             else
             {
-                lock (_pendingConsoleLock)
-                    _pendingConsoleChars.Enqueue((char)ch);
-                Dispatcher.BeginInvoke(() =>
-                {
-                    EnsureConsoleWindow();
-                    if (!_consoleWindow!.IsVisible)
-                        _consoleWindow.Show();
-                    lock (_pendingConsoleLock)
-                    {
-                        while (_pendingConsoleChars.Count > 0)
-                            _consoleWindow.AppendChar(_pendingConsoleChars.Dequeue());
-                    }
-                });
+                Dispatcher.BeginInvoke(DrainPendingConsoleChars);
             }
         };
         _plugin.emfe_set_console_char_callback(_instance, _consoleCharCb, IntPtr.Zero);
@@ -1756,6 +1759,21 @@ public partial class MainWindow : Window
     // ========================================================================
     // Console window
     // ========================================================================
+
+    private void DrainPendingConsoleChars()
+    {
+        // UI thread: pull the buffered chars out of the MainWindow queue into
+        // the console window's own terminal. ConsoleWindow.AppendChar is
+        // itself a lock+enqueue, which is fine to hit from the UI thread.
+        EnsureConsoleWindow();
+        if (!_consoleWindow!.IsVisible)
+            _consoleWindow.Show();
+        lock (_pendingConsoleLock)
+        {
+            while (_pendingConsoleChars.Count > 0)
+                _consoleWindow.AppendChar(_pendingConsoleChars.Dequeue());
+        }
+    }
 
     private void EnsureConsoleWindow()
     {
