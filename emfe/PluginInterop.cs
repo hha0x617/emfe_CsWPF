@@ -367,6 +367,14 @@ public class PluginInterop : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate EmfeResult SendCharDelegate(IntPtr instance, byte ch);
 
+    // Returns the number of characters the console RX buffer can accept
+    // right now.  0 means full (host should wait), > 0 means that many chars
+    // are safe to push, and -1 means the plugin doesn't expose this.  See
+    // emfe_plugin.h `emfe_console_tx_space`.  Optional — not every plugin
+    // exports it, so PluginInterop leaves it null on older DLLs.
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate int ConsoleTxSpaceDelegate(IntPtr instance);
+
     // Watchpoints
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate EmfeResult AddWatchpointDelegate(IntPtr instance, ulong address,
@@ -484,6 +492,7 @@ public class PluginInterop : IDisposable
     public AddListItemDelegate emfe_add_list_item = null!;
     public RemoveListItemDelegate emfe_remove_list_item = null!;
     public SendCharDelegate emfe_send_char = null!;
+    public ConsoleTxSpaceDelegate? emfe_console_tx_space;  // nullable — optional export
     public AddWatchpointDelegate emfe_add_watchpoint = null!;
     public RemoveWatchpointDelegate emfe_remove_watchpoint = null!;
     public EnableWatchpointDelegate emfe_enable_watchpoint = null!;
@@ -564,6 +573,7 @@ public class PluginInterop : IDisposable
         emfe_add_list_item = LoadFunc<AddListItemDelegate>("emfe_add_list_item");
         emfe_remove_list_item = LoadFunc<RemoveListItemDelegate>("emfe_remove_list_item");
         emfe_send_char = LoadFunc<SendCharDelegate>("emfe_send_char");
+        emfe_console_tx_space = TryLoadFunc<ConsoleTxSpaceDelegate>("emfe_console_tx_space");
         emfe_add_watchpoint = LoadFunc<AddWatchpointDelegate>("emfe_add_watchpoint");
         emfe_remove_watchpoint = LoadFunc<RemoveWatchpointDelegate>("emfe_remove_watchpoint");
         emfe_enable_watchpoint = LoadFunc<EnableWatchpointDelegate>("emfe_enable_watchpoint");
@@ -587,6 +597,13 @@ public class PluginInterop : IDisposable
     {
         var ptr = NativeLibrary.GetExport(_handle, name);
         return Marshal.GetDelegateForFunctionPointer<T>(ptr);
+    }
+
+    private T? TryLoadFunc<T>(string name) where T : Delegate
+    {
+        return NativeLibrary.TryGetExport(_handle, name, out var ptr)
+            ? Marshal.GetDelegateForFunctionPointer<T>(ptr)
+            : null;
     }
 
     public void Dispose()

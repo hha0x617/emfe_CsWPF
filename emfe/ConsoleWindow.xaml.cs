@@ -25,6 +25,10 @@ namespace emfe;
 public partial class ConsoleWindow : Window
 {
     private readonly Action<char>? _sendChar;
+    // Returns the number of chars the plugin's console RX buffer can accept
+    // right now, or -1 if the plugin doesn't support the query (host falls
+    // back to a fixed-size burst).  See emfe_plugin.h::emfe_console_tx_space.
+    private readonly Func<int>? _queryTxSpace;
     private readonly Vt100Terminal _terminal = new(80, 25, 2000);
     private readonly Queue<char> _outputQueue = new();
     private readonly object _outputLock = new();
@@ -35,10 +39,11 @@ public partial class ConsoleWindow : Window
     private int _searchIndex;
     private string _lastSearchText = string.Empty;
 
-    public ConsoleWindow(Action<char>? sendChar = null)
+    public ConsoleWindow(Action<char>? sendChar = null, Func<int>? queryTxSpace = null)
     {
         InitializeComponent();
         _sendChar = sendChar;
+        _queryTxSpace = queryTxSpace;
         Loaded += (_, _) => ThemeHelper.ApplyTitleBar(this, ThemeHelper.IsDarkMode);
 
         Title = $"Console ({_terminal.Cols}x{_terminal.Rows})";
@@ -92,30 +97,62 @@ public partial class ConsoleWindow : Window
         _pasteCts = new CancellationTokenSource();
         var ct = _pasteCts.Token;
 
-        // Burst-feed characters: push up to PasteBurstSize at the machine's
-        // full speed, then yield for 1 ms so the guest CPU's UART ISR can
-        // drain the receive FIFO before the next burst.  64 matches the
-        // 16550 FIFO depth used by the 68030 plugin, giving ~64 chars/ms
-        // (≈ 6 Mbps equivalent) — effectively instant for pasted text.
-        //
-        // TODO: when the plugin ABI gains a console-tx-space query, use
-        // that for real backpressure instead of the fixed burst size.
-        const int PasteBurstSize = 64;
+        // Prefer the plugin's native backpressure query when available —
+        // it lets us drip-feed exactly into the headroom of the guest UART
+        // RX FIFO, so long pastes neither flood nor silently drop bytes.
+        // Fall back to a 64-char burst (≈ UART16550 FIFO depth) with a
+        // 1 ms yield when the plugin doesn't expose the query.
+        int probe = _queryTxSpace?.Invoke() ?? -1;
         try
         {
-            int count = 0;
-            foreach (char ch in normalized)
-            {
-                if (ct.IsCancellationRequested) break;
-                _sendChar(ch);
-                if (++count >= PasteBurstSize)
-                {
-                    count = 0;
-                    await Task.Delay(1, ct);
-                }
-            }
+            if (probe >= 0)
+                await PasteWithHandshake(normalized, ct);
+            else
+                await PasteFixedBurst(normalized, ct, burst: 64, pauseMs: 1);
         }
         catch (TaskCanceledException) { /* paste interrupted — expected */ }
+    }
+
+    private async Task PasteWithHandshake(string text, CancellationToken ct)
+    {
+        int i = 0;
+        // Throttle per-send-burst so we don't starve the UI thread on
+        // huge pastes; also cap each send batch at CHUNK so the plugin
+        // has frequent chances to advertise drain.
+        const int Chunk = 64;
+        while (i < text.Length)
+        {
+            if (ct.IsCancellationRequested) return;
+            int space = _queryTxSpace!.Invoke();
+            if (space <= 0)
+            {
+                // Full — wait for the guest ISR to drain.  1 ms is a
+                // reasonable poll interval (matches typical timer tick).
+                await Task.Delay(1, ct);
+                continue;
+            }
+            int n = Math.Min(Math.Min(space, Chunk), text.Length - i);
+            for (int k = 0; k < n; k++)
+                _sendChar!(text[i + k]);
+            i += n;
+            // Yield so UI input (incl. cancel) stays responsive.
+            await Task.Yield();
+        }
+    }
+
+    private async Task PasteFixedBurst(string text, CancellationToken ct, int burst, int pauseMs)
+    {
+        int count = 0;
+        foreach (char ch in text)
+        {
+            if (ct.IsCancellationRequested) break;
+            _sendChar!(ch);
+            if (++count >= burst)
+            {
+                count = 0;
+                await Task.Delay(pauseMs, ct);
+            }
+        }
     }
 
     private void OnConsoleMenuSelectAll(object sender, RoutedEventArgs e)

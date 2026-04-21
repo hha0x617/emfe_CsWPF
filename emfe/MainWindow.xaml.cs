@@ -1659,11 +1659,21 @@ public partial class MainWindow : Window
     private void EnsureConsoleWindow()
     {
         if (_consoleWindow != null) return;
-        _consoleWindow = new ConsoleWindow(ch =>
-        {
-            if (_instance != IntPtr.Zero)
-                _plugin.emfe_send_char(_instance, (byte)ch);
-        });
+        _consoleWindow = new ConsoleWindow(
+            sendChar: ch =>
+            {
+                if (_instance != IntPtr.Zero)
+                    _plugin.emfe_send_char(_instance, (byte)ch);
+            },
+            queryTxSpace: () =>
+            {
+                // Only ask the plugin once per call.  A return of -1 means
+                // the plugin doesn't expose buffered console RX and the
+                // caller should fall back to its fixed-size burst path.
+                if (_instance == IntPtr.Zero) return -1;
+                var fn = _plugin?.emfe_console_tx_space;
+                return fn?.Invoke(_instance) ?? -1;
+            });
         _consoleWindow.Owner = this;
         _consoleWindow.Closed += (_, _) => _consoleWindow = null;
     }
