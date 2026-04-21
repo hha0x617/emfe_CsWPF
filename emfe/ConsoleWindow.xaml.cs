@@ -103,56 +103,84 @@ public partial class ConsoleWindow : Window
         // Fall back to a 64-char burst (≈ UART16550 FIFO depth) with a
         // 1 ms yield when the plugin doesn't expose the query.
         int probe = _queryTxSpace?.Invoke() ?? -1;
+        string origTitle = Title;
+        int total = normalized.Length;
+        int sent = 0;
+        string mode = probe >= 0 ? "handshake" : "burst";
         try
         {
             if (probe >= 0)
-                await PasteWithHandshake(normalized, ct);
+                sent = await PasteWithHandshake(normalized, ct, sent => UpdatePasteTitle(origTitle, sent, total, mode));
             else
-                await PasteFixedBurst(normalized, ct, burst: 64, pauseMs: 1);
+                sent = await PasteFixedBurst(normalized, ct, burst: 64, pauseMs: 1, report: sent => UpdatePasteTitle(origTitle, sent, total, mode));
         }
         catch (TaskCanceledException) { /* paste interrupted — expected */ }
+
+        // Leave the summary in the title briefly so the user can see whether
+        // the host sent everything; the 100 ms render tick restores it
+        // naturally on the next tick after we clear the flag.
+        Title = $"Pasted {sent}/{total} via {mode} — {origTitle}";
+        await Task.Delay(2500);
+        Title = origTitle;
     }
 
-    private async Task PasteWithHandshake(string text, CancellationToken ct)
+    private void UpdatePasteTitle(string origTitle, int sent, int total, string mode)
+    {
+        // Throttle title updates to ~20 Hz so they don't flood the UI thread
+        // with BindingEngine / property-change work on huge pastes.
+        long now = Environment.TickCount64;
+        if (now - _lastTitleUpdateTick < 50 && sent != total) return;
+        _lastTitleUpdateTick = now;
+        Title = $"Pasting {sent}/{total} via {mode} — {origTitle}";
+    }
+    private long _lastTitleUpdateTick;
+
+    private async Task<int> PasteWithHandshake(string text, CancellationToken ct, Action<int> report)
     {
         int i = 0;
-        // Throttle per-send-burst so we don't starve the UI thread on
-        // huge pastes; also cap each send batch at CHUNK so the plugin
-        // has frequent chances to advertise drain.
+        int stallMs = 0;                  // how long we've been waiting for space
         const int Chunk = 64;
+        const int StallBreakMs = 5000;    // give up if tx_space stays 0 too long
         while (i < text.Length)
         {
-            if (ct.IsCancellationRequested) return;
+            if (ct.IsCancellationRequested) return i;
             int space = _queryTxSpace!.Invoke();
             if (space <= 0)
             {
-                // Full — wait for the guest ISR to drain.  1 ms is a
-                // reasonable poll interval (matches typical timer tick).
                 await Task.Delay(1, ct);
+                stallMs += 1;
+                if (stallMs >= StallBreakMs) return i;  // give up; caller keeps last count
                 continue;
             }
+            stallMs = 0;
             int n = Math.Min(Math.Min(space, Chunk), text.Length - i);
             for (int k = 0; k < n; k++)
                 _sendChar!(text[i + k]);
             i += n;
-            // Yield so UI input (incl. cancel) stays responsive.
+            report(i);
             await Task.Yield();
         }
+        return i;
     }
 
-    private async Task PasteFixedBurst(string text, CancellationToken ct, int burst, int pauseMs)
+    private async Task<int> PasteFixedBurst(string text, CancellationToken ct, int burst, int pauseMs, Action<int> report)
     {
-        int count = 0;
+        int i = 0;
+        int countInBurst = 0;
         foreach (char ch in text)
         {
             if (ct.IsCancellationRequested) break;
             _sendChar!(ch);
-            if (++count >= burst)
+            i++;
+            if (++countInBurst >= burst)
             {
-                count = 0;
+                countInBurst = 0;
+                report(i);
                 await Task.Delay(pauseMs, ct);
             }
         }
+        report(i);
+        return i;
     }
 
     private void OnConsoleMenuSelectAll(object sender, RoutedEventArgs e)
