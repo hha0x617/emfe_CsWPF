@@ -532,6 +532,26 @@
                 <Setter Property="Background" Value="{DynamicResource ThemeSeparator}"/>
             </Style>
 
+            <!-- Separator as it appears INSIDE a MenuItem / ContextMenu.
+                 WPF's internal MenuItem.SeparatorStyleKey style indents the
+                 separator from the left to match the default icon column —
+                 that's the "空白 for icons" area the user sees to the left
+                 of the separator line. Override it so the separator spans
+                 the full menu width with no left indent. -->
+            <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+                <Setter Property="Background" Value="{DynamicResource ThemeSeparator}"/>
+                <Setter Property="Margin" Value="0,3"/>
+                <Setter Property="Height" Value="1"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Separator">
+                            <Border Background="{TemplateBinding Background}" Height="1"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style TargetType="TabControl">
                 <Setter Property="Background" Value="{DynamicResource ThemeWindowBg}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
