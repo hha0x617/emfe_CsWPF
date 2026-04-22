@@ -32,12 +32,31 @@
                 <Setter Property="Foreground" Value="{DynamicResource ThemeForeground}"/>
             </Style>
 
+            <!-- Styled context menu for every TextBox. WPF auto-generates a
+                 Cut/Copy/Paste context menu at runtime for editable TextBoxes,
+                 but that auto-generated menu intermittently fails to pick up
+                 the app-wide implicit ContextMenu/MenuItem styles and
+                 renders with the system light theme. Setting the TextBox's
+                 ContextMenu explicitly replaces the auto one with ours, which
+                 DOES get the implicit ContextMenu/MenuItem styling.
+                 x:Shared="False" so each TextBox gets its own instance —
+                 ContextMenu objects can't be attached to multiple logical
+                 parents. -->
+            <ContextMenu x:Key="StyledTextBoxContextMenu" x:Shared="False">
+                <MenuItem Command="ApplicationCommands.Cut"       Header="Cu_t"/>
+                <MenuItem Command="ApplicationCommands.Copy"      Header="_Copy"/>
+                <MenuItem Command="ApplicationCommands.Paste"     Header="_Paste"/>
+                <Separator/>
+                <MenuItem Command="ApplicationCommands.SelectAll" Header="Select _All"/>
+            </ContextMenu>
+
             <Style TargetType="TextBox">
                 <Setter Property="Background" Value="{DynamicResource ThemeInputBg}"/>
                 <Setter Property="Foreground" Value="{DynamicResource ThemeForeground}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
                 <Setter Property="CaretBrush" Value="{DynamicResource ThemeForeground}"/>
                 <Setter Property="SelectionBrush" Value="{DynamicResource ThemeListSelection}"/>
+                <Setter Property="ContextMenu" Value="{StaticResource StyledTextBoxContextMenu}"/>
             </Style>
 
             <!-- Minimal TextBox template for memory dump cells.
@@ -484,8 +503,17 @@
             </ControlTemplate>
 
             <Style TargetType="MenuItem">
+                <!-- OverridesDefaultStyle=True ensures WPF doesn't merge our
+                     Setters on top of the Aero2 default MenuItem style, which
+                     was slipping the default icon/check column + vertical
+                     separator through despite our custom Template. With this
+                     flag set, WPF ignores the default style completely and
+                     only our Setters apply, so our single-column template is
+                     the only chrome the item gets. -->
+                <Setter Property="OverridesDefaultStyle" Value="True"/>
                 <Setter Property="Background" Value="{DynamicResource ThemePanelBg}"/>
                 <Setter Property="Foreground" Value="{DynamicResource ThemeBrightFg}"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
                 <Setter Property="Template" Value="{StaticResource DarkSubmenuItemTemplate}"/>
                 <Style.Triggers>
                     <Trigger Property="Role" Value="TopLevelHeader">
@@ -553,11 +581,14 @@
             </Style>
 
             <Style TargetType="ContextMenu">
+                <Setter Property="OverridesDefaultStyle" Value="True"/>
                 <Setter Property="Background" Value="{DynamicResource ThemePanelBg}"/>
                 <Setter Property="Foreground" Value="{DynamicResource ThemeBrightFg}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
                 <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="Padding" Value="0,4"/>
+                <Setter Property="HasDropShadow" Value="False"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ContextMenu">
