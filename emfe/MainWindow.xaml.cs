@@ -68,7 +68,7 @@ public partial class MainWindow : Window
     private int _statsViewMode;
 
     private record RegUIEntry(uint RegId, uint BitWidth, EmfeRegType Type, TextBox ValueBox);
-    private record FlagCheckEntry(byte BitMask, int FlagIndex, CheckBox CheckBox);
+    private record FlagCheckEntry(uint RegId, byte BitIndex, CheckBox CheckBox);
     private uint _pcRegId = 16; // default m68030, updated from plugin register defs
     private uint _spRegId = 15; // default m68030, updated from plugin register defs
     private int _addrDigits = 8; // hex digits for address display (4 or 8)
@@ -786,6 +786,55 @@ public partial class MainWindow : Window
                     _regEntries[^1] = _regEntries[^1] with { BitWidth = def.bit_width, Type = (EmfeRegType)def.type };
                     if ((EmfeRegType)def.type == EmfeRegType.Float)
                         box.FontSize = 11;
+
+                    // If this is a flags register and the plugin supports the
+                    // optional bit-decomposition export, render a row of
+                    // CheckBoxes underneath. Each checkbox click reads the
+                    // parent register, flips the indexed bit, and writes it
+                    // back via emfe_set_registers.
+                    if (isFlags && _plugin.emfe_get_register_flag_defs != null)
+                    {
+                        int nBits = _plugin.emfe_get_register_flag_defs(_instance, def.reg_id, out IntPtr bitsPtr);
+                        if (nBits > 0 && bitsPtr != IntPtr.Zero)
+                        {
+                            int bitStructSize = Marshal.SizeOf<EmfeRegFlagBitDef>();
+                            var flagRow = new StackPanel
+                            {
+                                Orientation = Orientation.Horizontal,
+                                Margin = new Thickness(0, 0, 0, 4)
+                            };
+                            uint regId = def.reg_id;
+                            bool readOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0;
+                            for (int b = 0; b < nBits; b++)
+                            {
+                                var bitDef = Marshal.PtrToStructure<EmfeRegFlagBitDef>(bitsPtr + b * bitStructSize);
+                                byte bitIndex = bitDef.bit_index;
+                                var chk = new CheckBox
+                                {
+                                    Content = bitDef.Label,
+                                    IsThreeState = false,
+                                    IsEnabled = !readOnly,
+                                    Margin = new Thickness(0, 0, 8, 0),
+                                    VerticalAlignment = VerticalAlignment.Center
+                                };
+                                chk.SetResourceReference(CheckBox.ForegroundProperty, "ThemeForeground");
+                                chk.Click += (s, e) =>
+                                {
+                                    if (_plugin.emfe_get_state(_instance) == EmfeState.Running) return;
+                                    var rv = new EmfeRegValue[] { new() { reg_id = regId } };
+                                    _plugin.emfe_get_registers(_instance, rv, 1);
+                                    ulong mask = 1UL << bitIndex;
+                                    if (chk.IsChecked == true) rv[0].u64 |= mask;
+                                    else                       rv[0].u64 &= ~mask;
+                                    _plugin.emfe_set_registers(_instance, rv, 1);
+                                    UpdateRegisters();
+                                };
+                                flagRow.Children.Add(chk);
+                                _flagEntries.Add(new FlagCheckEntry(regId, bitIndex, chk));
+                            }
+                            panel.Children.Add(flagRow);
+                        }
+                    }
                 }
                 RegisterPanel.Children.Add(panel);
             }
@@ -819,6 +868,26 @@ public partial class MainWindow : Window
                             ? $"{(uint)values[i].u64:X8}"
                             : $"{values[i].u64:X16}";
             entry.ValueBox.Text = text;
+        }
+
+        // Flag checkboxes — populated by BuildRegisterPanel from the plugin's
+        // emfe_get_register_flag_defs. Read each parent register once, then
+        // assign each checkbox's IsChecked from the indexed bit.
+        if (_flagEntries.Count > 0)
+        {
+            var flagRegIds = _flagEntries.Select(f => f.RegId).Distinct().ToList();
+            var flagReads = new EmfeRegValue[flagRegIds.Count];
+            for (int i = 0; i < flagRegIds.Count; i++)
+                flagReads[i].reg_id = flagRegIds[i];
+            _plugin.emfe_get_registers(_instance, flagReads, flagReads.Length);
+            var regValues = new Dictionary<uint, ulong>();
+            for (int i = 0; i < flagRegIds.Count; i++)
+                regValues[flagRegIds[i]] = flagReads[i].u64;
+            foreach (var f in _flagEntries)
+            {
+                ulong v = regValues[f.RegId];
+                f.CheckBox.IsChecked = ((v >> f.BitIndex) & 1UL) != 0;
+            }
         }
 
         // Cycles/MHz/MIPS display is driven by the periodic stats timer and

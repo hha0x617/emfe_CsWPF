@@ -78,6 +78,15 @@ public struct EmfeRegisterDef
     public string Group => Marshal.PtrToStringAnsi(group) ?? "";
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct EmfeRegFlagBitDef
+{
+    public byte bit_index;     // 0 = LSB
+    public IntPtr label;       // const char*
+
+    public string Label => Marshal.PtrToStringAnsi(label) ?? "";
+}
+
 [StructLayout(LayoutKind.Explicit, Size = 24)]
 public struct EmfeRegValue
 {
@@ -223,6 +232,9 @@ public class PluginInterop : IDisposable
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate int GetRegisterDefsDelegate(IntPtr instance, out IntPtr defs);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate int GetRegisterFlagDefsDelegate(IntPtr instance, uint reg_id, out IntPtr defs);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate EmfeResult GetRegistersDelegate(IntPtr instance, [In, Out] EmfeRegValue[] values, int count);
@@ -449,6 +461,7 @@ public class PluginInterop : IDisposable
     public SetStateChangeCallbackDelegate emfe_set_state_change_callback = null!;
     public SetDiagnosticCallbackDelegate emfe_set_diagnostic_callback = null!;
     public GetRegisterDefsDelegate emfe_get_register_defs = null!;
+    public GetRegisterFlagDefsDelegate? emfe_get_register_flag_defs;  // optional
     public GetRegistersDelegate emfe_get_registers = null!;
     public SetRegistersDelegate emfe_set_registers = null!;
     public PeekByteDelegate emfe_peek_byte = null!;
@@ -531,6 +544,7 @@ public class PluginInterop : IDisposable
         emfe_set_state_change_callback = LoadFunc<SetStateChangeCallbackDelegate>("emfe_set_state_change_callback");
         emfe_set_diagnostic_callback = LoadFunc<SetDiagnosticCallbackDelegate>("emfe_set_diagnostic_callback");
         emfe_get_register_defs = LoadFunc<GetRegisterDefsDelegate>("emfe_get_register_defs");
+        emfe_get_register_flag_defs = TryLoadFunc<GetRegisterFlagDefsDelegate>("emfe_get_register_flag_defs");
         emfe_get_registers = LoadFunc<GetRegistersDelegate>("emfe_get_registers");
         emfe_set_registers = LoadFunc<SetRegistersDelegate>("emfe_set_registers");
         emfe_peek_byte = LoadFunc<PeekByteDelegate>("emfe_peek_byte");
