@@ -642,7 +642,10 @@ public partial class MainWindow : Window
     {
         var sp = new StackPanel
         {
-            Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 8, 1)
+            Orientation = Orientation.Horizontal,
+            // Wider right margin for column 0 so the first row's value
+            // box is visibly separated from the second row's label.
+            Margin = new Thickness(0, 1, col == 0 ? 16 : 0, 1)
         };
         sp.Children.Add(new TextBlock
         {
