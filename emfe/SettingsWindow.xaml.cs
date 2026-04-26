@@ -463,6 +463,28 @@ public partial class SettingsWindow : Window
 
     private void SaveToStaging()
     {
+        // Detect TargetOS change BEFORE we start writing values. The mc68030
+        // plugin reacts to a TargetOS write by swapping which list backs the
+        // Mvme147ScsiDisks LIST setting. Our dialog-side cache _pendingLists
+        // won't notice that swap, so we flush list edits to the plugin under
+        // the OLD OS first (so the per-OS swap captures them under the right
+        // slot), then drop the cache so the next RebuildUI / EnsureListStaged
+        // re-reads the new OS's list.
+        string? prevTargetOS = null, newTargetOS = null;
+        foreach (var (key, type, control) in _settingControls)
+        {
+            if (key != "TargetOS" || type != EmfeSettingType.Combo) continue;
+            newTargetOS = ((ComboBox)control).SelectedItem?.ToString();
+            prevTargetOS = _plugin.emfe_get_setting(_instance, "TargetOS");
+            break;
+        }
+        bool targetOSChanging = !string.IsNullOrEmpty(newTargetOS) && prevTargetOS != newTargetOS;
+        if (targetOSChanging)
+        {
+            ApplyStagedListsToPlugin();
+            _pendingLists.Clear();
+        }
+
         foreach (var (key, type, control) in _settingControls)
         {
             string? val = type switch
