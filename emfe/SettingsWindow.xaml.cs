@@ -475,7 +475,7 @@ public partial class SettingsWindow : Window
         {
             if (key != "TargetOS" || type != EmfeSettingType.Combo) continue;
             newTargetOS = ((ComboBox)control).SelectedItem?.ToString();
-            prevTargetOS = _plugin.emfe_get_setting(_instance, "TargetOS");
+            prevTargetOS = Marshal.PtrToStringAnsi(_plugin.emfe_get_setting(_instance, "TargetOS"));
             break;
         }
         bool targetOSChanging = !string.IsNullOrEmpty(newTargetOS) && prevTargetOS != newTargetOS;
