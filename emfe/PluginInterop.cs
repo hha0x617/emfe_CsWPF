@@ -364,6 +364,9 @@ public class PluginInterop : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
     public delegate EmfeResult RemoveListItemDelegate(IntPtr instance, string listKey, int itemIndex);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    public delegate int IsListPendingDelegate(IntPtr instance, string listKey);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate EmfeResult SendCharDelegate(IntPtr instance, byte ch);
 
@@ -491,6 +494,7 @@ public class PluginInterop : IDisposable
     public SetListItemFieldDelegate emfe_set_list_item_field = null!;
     public AddListItemDelegate emfe_add_list_item = null!;
     public RemoveListItemDelegate emfe_remove_list_item = null!;
+    public IsListPendingDelegate? emfe_is_list_pending;  // nullable — optional export
     public SendCharDelegate emfe_send_char = null!;
     public ConsoleTxSpaceDelegate? emfe_console_tx_space;  // nullable — optional export
     public AddWatchpointDelegate emfe_add_watchpoint = null!;
@@ -572,6 +576,7 @@ public class PluginInterop : IDisposable
         emfe_set_list_item_field = LoadFunc<SetListItemFieldDelegate>("emfe_set_list_item_field");
         emfe_add_list_item = LoadFunc<AddListItemDelegate>("emfe_add_list_item");
         emfe_remove_list_item = LoadFunc<RemoveListItemDelegate>("emfe_remove_list_item");
+        emfe_is_list_pending = TryLoadFunc<IsListPendingDelegate>("emfe_is_list_pending");
         emfe_send_char = LoadFunc<SendCharDelegate>("emfe_send_char");
         emfe_console_tx_space = TryLoadFunc<ConsoleTxSpaceDelegate>("emfe_console_tx_space");
         emfe_add_watchpoint = LoadFunc<AddWatchpointDelegate>("emfe_add_watchpoint");

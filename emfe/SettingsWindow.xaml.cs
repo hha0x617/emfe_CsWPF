@@ -315,13 +315,47 @@ public partial class SettingsWindow : Window
         EnsureListStaged(listKey);
         var items = _pendingLists[listKey];
 
+        // Pending indicator: REQUIRES_RESET LIST setting whose staged value
+        // (== _pendingLists snapshot, just refreshed from stagedConfig by
+        // EnsureListStaged) differs from what the running hardware has
+        // applied. Same UX as the per-row '*' marker on plain settings.
+        bool isPending = false;
+        if (_plugin.emfe_is_list_pending != null)
+        {
+            // Push _pendingLists to stagedConfig before checking so user's
+            // unflushed in-dialog edits also count as pending.
+            ApplyStagedListsToPlugin();
+            isPending = _plugin.emfe_is_list_pending(_instance, listKey) != 0;
+        }
+
+        var headerRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 8, 0, 4)
+        };
+
         var header = new TextBlock
         {
             Text = label, FontSize = 13, FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 8, 0, 4)
+            VerticalAlignment = VerticalAlignment.Center
         };
         header.SetResourceReference(TextBlock.ForegroundProperty, "ThemeRegHeaderFg");
-        parent.Children.Add(header);
+        headerRow.Children.Add(header);
+
+        if (isPending)
+        {
+            var pendingMark = new TextBlock
+            {
+                Text = "*", FontSize = 14, FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x99, 0x00)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = "This change is staged but not yet applied. It will take effect on the next full reset or when emfe restarts."
+            };
+            headerRow.Children.Add(pendingMark);
+        }
+
+        parent.Children.Add(headerRow);
 
         for (int idx = 0; idx < items.Count; idx++)
         {
