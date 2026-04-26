@@ -801,7 +801,10 @@ public partial class MainWindow : Window
                             var flagRow = new StackPanel
                             {
                                 Orientation = Orientation.Horizontal,
-                                Margin = new Thickness(0, 0, 0, 4)
+                                // Indent so the first checkbox starts where
+                                // the value textbox does on the row above
+                                // (label width 35, matching AddRegRow).
+                                Margin = new Thickness(35, 0, 0, 4)
                             };
                             uint regId = def.reg_id;
                             bool readOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0;
