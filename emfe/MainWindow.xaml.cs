@@ -717,28 +717,34 @@ public partial class MainWindow : Window
         ulong memSize = _plugin.emfe_get_memory_size(_instance);
         _addrDigits = memSize <= 0x10000 ? 4 : 8;
 
-        // Panel header with Edit/Apply/Cancel
-        var headerGrid = new Grid();
-        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        headerGrid.Children.Add(new TextBlock
+        // Panel header with Edit/Apply/Cancel — left-aligned to match
+        // the Disassembly / Memory Dump pane headers. The previous
+        // Grid (Star, Auto) layout pushed the buttons to the right edge
+        // of whatever the ScrollViewer's content width was, which after
+        // horizontal-scroll was enabled (e796f10) put them past the
+        // visible viewport.
+        var headerPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        headerPanel.Children.Add(new TextBlock
         {
             Text = "Registers", FontSize = 12, FontWeight = FontWeights.SemiBold,
-            Foreground = PanelHeaderBrush, Margin = new Thickness(4, 2, 0, 4)
+            Foreground = PanelHeaderBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 8, 0)
         });
-        var editBtnPanel = new StackPanel { Orientation = Orientation.Horizontal };
         _btnRegEdit = new Button { Content = "Edit", FontSize = 11, Padding = new Thickness(6, 2, 6, 2), Margin = new Thickness(2, 0, 2, 0) };
         _btnRegApply = new Button { Content = "Apply", FontSize = 11, Padding = new Thickness(6, 2, 6, 2), Margin = new Thickness(2, 0, 2, 0), Visibility = Visibility.Collapsed };
         _btnRegCancel = new Button { Content = "Cancel", FontSize = 11, Padding = new Thickness(6, 2, 6, 2), Margin = new Thickness(2, 0, 2, 0), Visibility = Visibility.Collapsed };
         _btnRegEdit.Click += OnRegEdit;
         _btnRegApply.Click += OnRegApply;
         _btnRegCancel.Click += OnRegCancel;
-        editBtnPanel.Children.Add(_btnRegEdit);
-        editBtnPanel.Children.Add(_btnRegApply);
-        editBtnPanel.Children.Add(_btnRegCancel);
-        Grid.SetColumn(editBtnPanel, 1);
-        headerGrid.Children.Add(editBtnPanel);
-        RegisterPanel.Children.Add(headerGrid);
+        headerPanel.Children.Add(_btnRegEdit);
+        headerPanel.Children.Add(_btnRegApply);
+        headerPanel.Children.Add(_btnRegCancel);
+        RegisterPanel.Children.Add(headerPanel);
 
         // Group registers by their group name
         var groups = new List<(string Group, List<(EmfeRegisterDef Def, int Index)> Regs)>();
