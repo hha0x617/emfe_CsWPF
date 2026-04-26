@@ -824,6 +824,25 @@ public partial class MainWindow : Window
                                     VerticalAlignment = VerticalAlignment.Center
                                 };
                                 chk.SetResourceReference(CheckBox.ForegroundProperty, "ThemeForeground");
+                                // Live-mirror checkbox edits into the value
+                                // textbox hex display while in Edit mode.
+                                // Register write-back still happens at OnRegApply.
+                                chk.Click += (s, e) =>
+                                {
+                                    var entry = _regEntries.FirstOrDefault(r => r.RegId == regId);
+                                    if (entry?.ValueBox == null) return;
+                                    if (!ulong.TryParse(entry.ValueBox.Text,
+                                        System.Globalization.NumberStyles.HexNumber, null, out ulong v))
+                                        return;
+                                    ulong mask = 1UL << bitIndex;
+                                    if (chk.IsChecked == true) v |= mask;
+                                    else                       v &= ~mask;
+                                    string text = entry.BitWidth <= 8  ? $"{(byte)v:X2}"
+                                                : entry.BitWidth <= 16 ? $"{(ushort)v:X4}"
+                                                : entry.BitWidth <= 32 ? $"{(uint)v:X8}"
+                                                                       : $"{v:X16}";
+                                    entry.ValueBox.Text = text;
+                                };
                                 _ = readOnly; // reserved for future per-register read-only handling
                                 flagRow.Children.Add(chk);
                                 _flagEntries.Add(new FlagCheckEntry(regId, bitIndex, chk));
