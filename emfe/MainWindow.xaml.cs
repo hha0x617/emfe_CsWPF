@@ -74,8 +74,15 @@ public partial class MainWindow : Window
     // Re-entrancy guard for two-way checkbox ↔ textbox sync. Set true
     // while the checkbox-click handler writes into the textbox, so the
     // textbox's TextChanged handler skips its own checkbox refresh and
-    // doesn't ping-pong values back.
+    // doesn't ping-pong values back. Also re-used by RecomputeViewRegister
+    // to suppress its own write-back from triggering a re-entry.
     private bool _suppressFlagSync = false;
+
+    // Synthetic / view register entries — registers whose value is
+    // composed live from one or more source registers (see
+    // emfe_get_register_view_deps). Example: mc6809 D = A:B.
+    private record RegViewEntry(uint RegId, uint BitWidth, TextBox ViewBox, List<EmfeRegViewDep> Deps);
+    private readonly List<RegViewEntry> _viewRegEntries = new();
     private uint _pcRegId = 16; // default m68030, updated from plugin register defs
     private uint _spRegId = 15; // default m68030, updated from plugin register defs
     private int _addrDigits = 8; // hex digits for address display (4 or 8)
@@ -697,6 +704,7 @@ public partial class MainWindow : Window
         RegisterPanel.Children.Clear();
         _regEntries.Clear();
         _flagEntries.Clear();
+        _viewRegEntries.Clear();
 
         if (_instance == IntPtr.Zero) return;
 
@@ -797,6 +805,7 @@ public partial class MainWindow : Window
                         Type = (EmfeRegType)def.type,
                         ReadOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0
                     };
+                    RegisterViewDepCapture(def);
                 }
                 RegisterPanel.Children.Add(grid);
             }
@@ -814,6 +823,7 @@ public partial class MainWindow : Window
                         Type = (EmfeRegType)def.type,
                         ReadOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0
                     };
+                    RegisterViewDepCapture(def);
                     if ((EmfeRegType)def.type == EmfeRegType.Float)
                         box.FontSize = 11;
 
@@ -905,6 +915,70 @@ public partial class MainWindow : Window
                 RegisterPanel.Children.Add(panel);
             }
         }
+
+        // Wire up TextChanged on every source register's textbox so that
+        // synthetic view registers (mc6809 D = A:B etc.) recompute live
+        // while the user edits the sources in Edit mode. Done after all
+        // register rows have been built so the source textboxes exist.
+        foreach (var view in _viewRegEntries)
+        {
+            uint viewRegId = view.RegId;
+            foreach (var dep in view.Deps)
+            {
+                var src = _regEntries.FirstOrDefault(r => r.RegId == dep.reg_id);
+                if (src?.ValueBox == null) continue;
+                src.ValueBox.TextChanged += (s, e) =>
+                {
+                    if (_suppressFlagSync) return;
+                    RecomputeViewRegister(viewRegId);
+                };
+            }
+        }
+    }
+
+    private void RegisterViewDepCapture(EmfeRegisterDef def)
+    {
+        if (_plugin.emfe_get_register_view_deps == null) return;
+        int nDeps = _plugin.emfe_get_register_view_deps(_instance, def.reg_id, out IntPtr depsPtr);
+        if (nDeps <= 0 || depsPtr == IntPtr.Zero) return;
+
+        // Mark the entry read-only — the view follows the sources, so it's
+        // never directly editable.
+        _regEntries[^1] = _regEntries[^1] with { ReadOnly = true };
+
+        int sz = Marshal.SizeOf<EmfeRegViewDep>();
+        var deps = new List<EmfeRegViewDep>(nDeps);
+        for (int i = 0; i < nDeps; i++)
+            deps.Add(Marshal.PtrToStructure<EmfeRegViewDep>(depsPtr + i * sz));
+        _viewRegEntries.Add(new RegViewEntry(def.reg_id, def.bit_width, _regEntries[^1].ValueBox, deps));
+    }
+
+    private void RecomputeViewRegister(uint regId)
+    {
+        var view = _viewRegEntries.FirstOrDefault(v => v.RegId == regId);
+        if (view == null || view.ViewBox == null) return;
+
+        ulong v = 0;
+        foreach (var dep in view.Deps)
+        {
+            var src = _regEntries.FirstOrDefault(r => r.RegId == dep.reg_id);
+            if (src?.ValueBox == null) continue;
+            if (!ulong.TryParse(src.ValueBox.Text,
+                System.Globalization.NumberStyles.HexNumber, null, out ulong srcVal))
+                continue;
+            ulong mask = dep.width >= 64 ? ~0UL : ((1UL << dep.width) - 1);
+            v |= (srcVal & mask) << dep.shift;
+        }
+
+        string text = view.BitWidth <= 8  ? $"{(byte)v:X2}"
+                    : view.BitWidth <= 16 ? $"{(ushort)v:X4}"
+                    : view.BitWidth <= 32 ? $"{(uint)v:X8}"
+                                          : $"{v:X16}";
+        // Suppress flag-sync re-entrancy (in case the view register also
+        // had a flag-bit decomposition wired up; not the case today).
+        _suppressFlagSync = true;
+        view.ViewBox.Text = text;
+        _suppressFlagSync = false;
     }
 
     // ========================================================================
