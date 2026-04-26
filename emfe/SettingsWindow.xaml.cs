@@ -344,13 +344,28 @@ public partial class SettingsWindow : Window
 
         if (isPending)
         {
+            // WPF ToolTip defaults to system colors that clash with the
+            // Dark theme — build it explicitly from theme resources so the
+            // text stays readable in both Dark and Light.
+            var tipBody = new TextBlock
+            {
+                Text = "This change is staged but not yet applied. It will take effect on the next full reset or when emfe restarts.",
+                Padding = new Thickness(8, 4, 8, 4),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 360
+            };
+            tipBody.SetResourceReference(TextBlock.ForegroundProperty, "ThemeForeground");
+            var tip = new ToolTip { Content = tipBody, Padding = new Thickness(0) };
+            tip.SetResourceReference(Control.BackgroundProperty, "ThemeControlBg");
+            tip.SetResourceReference(Control.BorderBrushProperty, "ThemeBorder");
+
             var pendingMark = new TextBlock
             {
                 Text = "*", FontSize = 14, FontWeight = FontWeights.Bold,
                 Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x99, 0x00)),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 0, 0),
-                ToolTip = "This change is staged but not yet applied. It will take effect on the next full reset or when emfe restarts."
+                ToolTip = tip
             };
             headerRow.Children.Add(pendingMark);
         }
