@@ -69,6 +69,11 @@ public partial class MainWindow : Window
 
     private record RegUIEntry(uint RegId, uint BitWidth, EmfeRegType Type, TextBox ValueBox);
     private record FlagCheckEntry(uint RegId, byte BitIndex, CheckBox CheckBox);
+    // Re-entrancy guard for two-way checkbox ↔ textbox sync. Set true
+    // while the checkbox-click handler writes into the textbox, so the
+    // textbox's TextChanged handler skips its own checkbox refresh and
+    // doesn't ping-pong values back.
+    private bool _suppressFlagSync = false;
     private uint _pcRegId = 16; // default m68030, updated from plugin register defs
     private uint _spRegId = 15; // default m68030, updated from plugin register defs
     private int _addrDigits = 8; // hex digits for address display (4 or 8)
@@ -841,13 +846,34 @@ public partial class MainWindow : Window
                                                 : entry.BitWidth <= 16 ? $"{(ushort)v:X4}"
                                                 : entry.BitWidth <= 32 ? $"{(uint)v:X8}"
                                                                        : $"{v:X16}";
+                                    _suppressFlagSync = true;
                                     entry.ValueBox.Text = text;
+                                    _suppressFlagSync = false;
                                 };
                                 _ = readOnly; // reserved for future per-register read-only handling
                                 flagRow.Children.Add(chk);
                                 _flagEntries.Add(new FlagCheckEntry(regId, bitIndex, chk));
                             }
                             panel.Children.Add(flagRow);
+
+                            // Reverse direction: hex textbox edits flow back
+                            // into the checkbox row in real time. Skips when
+                            // the checkbox-click handler is the writer.
+                            uint regIdCapture = def.reg_id;
+                            box.TextChanged += (s, e) =>
+                            {
+                                if (_suppressFlagSync) return;
+                                var entry2 = _regEntries.FirstOrDefault(r => r.RegId == regIdCapture);
+                                if (entry2?.ValueBox == null) return;
+                                if (!ulong.TryParse(entry2.ValueBox.Text,
+                                    System.Globalization.NumberStyles.HexNumber, null, out ulong v))
+                                    return;
+                                foreach (var f in _flagEntries)
+                                {
+                                    if (f.RegId != regIdCapture) continue;
+                                    f.CheckBox.IsChecked = ((v >> f.BitIndex) & 1UL) != 0;
+                                }
+                            };
                         }
                     }
                 }
