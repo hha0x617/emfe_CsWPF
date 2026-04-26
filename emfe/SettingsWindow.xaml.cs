@@ -464,12 +464,17 @@ public partial class SettingsWindow : Window
     private void SaveToStaging()
     {
         // Detect TargetOS change BEFORE we start writing values. The mc68030
-        // plugin reacts to a TargetOS write by swapping which list backs the
-        // Mvme147ScsiDisks LIST setting. Our dialog-side cache _pendingLists
-        // won't notice that swap, so we flush list edits to the plugin under
-        // the OLD OS first (so the per-OS swap captures them under the right
-        // slot), then drop the cache so the next RebuildUI / EnsureListStaged
-        // re-reads the new OS's list.
+        // plugin reacts to a TargetOS write by swapping per-OS settings —
+        // the Mvme147ScsiDisks LIST plus the CD-ROM path / SCSI ID strings.
+        // To make that work end-to-end:
+        //   (a) Flush list edits to the plugin under the OLD OS so the
+        //       per-OS swap captures them on the right slot, and drop the
+        //       dialog-side cache so the next RebuildUI / EnsureListStaged
+        //       refills it from the new OS.
+        //   (b) Write all OTHER settings BEFORE writing TargetOS — the loop
+        //       order in _settingControls would otherwise overwrite the
+        //       new OS's just-restored values with whatever the UI was
+        //       still showing from the old OS.
         string? prevTargetOS = null, newTargetOS = null;
         foreach (var (key, type, control) in _settingControls)
         {
@@ -485,8 +490,11 @@ public partial class SettingsWindow : Window
             _pendingLists.Clear();
         }
 
+        // Pass 1: every setting except TargetOS — captures the current OS's
+        // state into the plugin before the per-OS swap fires.
         foreach (var (key, type, control) in _settingControls)
         {
+            if (key == "TargetOS") continue;
             string? val = type switch
             {
                 EmfeSettingType.Bool => ((CheckBox)control).IsChecked == true ? "true" : "false",
@@ -495,6 +503,20 @@ public partial class SettingsWindow : Window
             };
             if (val != null)
                 _plugin.emfe_set_setting(_instance, key, val);
+        }
+        // Pass 2: TargetOS — plugin swaps active per-OS values to the new OS.
+        foreach (var (key, type, control) in _settingControls)
+        {
+            if (key != "TargetOS") continue;
+            string? val = type switch
+            {
+                EmfeSettingType.Bool => ((CheckBox)control).IsChecked == true ? "true" : "false",
+                EmfeSettingType.Combo => ((ComboBox)control).SelectedItem?.ToString(),
+                _ => ((TextBox)control).Text
+            };
+            if (val != null)
+                _plugin.emfe_set_setting(_instance, key, val);
+            break;
         }
     }
 
