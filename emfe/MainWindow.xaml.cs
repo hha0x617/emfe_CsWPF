@@ -67,7 +67,9 @@ public partial class MainWindow : Window
     private double _instMhz, _instMips, _avgMhz, _avgMips;
     private int _statsViewMode;
 
-    private record RegUIEntry(uint RegId, uint BitWidth, EmfeRegType Type, TextBox ValueBox);
+    // ReadOnly = true → textbox stays IsReadOnly even in Edit mode (e.g.
+    // mc6809 D, the synthetic A:B view).
+    private record RegUIEntry(uint RegId, uint BitWidth, EmfeRegType Type, TextBox ValueBox, bool ReadOnly = false);
     private record FlagCheckEntry(uint RegId, byte BitIndex, CheckBox CheckBox);
     // Re-entrancy guard for two-way checkbox ↔ textbox sync. Set true
     // while the checkbox-click handler writes into the textbox, so the
@@ -790,7 +792,11 @@ public partial class MainWindow : Window
                 {
                     var (def, _) = regs[j];
                     AddRegPairToGrid(grid, j / 2, j % 2, def.Name, def.reg_id);
-                    _regEntries[^1] = _regEntries[^1] with { BitWidth = def.bit_width, Type = (EmfeRegType)def.type };
+                    _regEntries[^1] = _regEntries[^1] with {
+                        BitWidth = def.bit_width,
+                        Type = (EmfeRegType)def.type,
+                        ReadOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0
+                    };
                 }
                 RegisterPanel.Children.Add(grid);
             }
@@ -803,7 +809,11 @@ public partial class MainWindow : Window
                     bool isFlags = (def.flags & (uint)EmfeRegFlags.Flags) != 0;
                     int width = def.bit_width <= 8 ? 45 : def.bit_width <= 16 ? 65 : def.bit_width <= 32 ? 95 : 130;
                     var box = AddRegRow(panel, def.Name, def.reg_id, width);
-                    _regEntries[^1] = _regEntries[^1] with { BitWidth = def.bit_width, Type = (EmfeRegType)def.type };
+                    _regEntries[^1] = _regEntries[^1] with {
+                        BitWidth = def.bit_width,
+                        Type = (EmfeRegType)def.type,
+                        ReadOnly = (def.flags & (uint)EmfeRegFlags.ReadOnly) != 0
+                    };
                     if ((EmfeRegType)def.type == EmfeRegType.Float)
                         box.FontSize = 11;
 
@@ -1800,7 +1810,8 @@ public partial class MainWindow : Window
     private void OnRegEdit(object sender, RoutedEventArgs e)
     {
         foreach (var entry in _regEntries)
-            entry.ValueBox.IsReadOnly = false;
+            if (!entry.ReadOnly)
+                entry.ValueBox.IsReadOnly = false;
         foreach (var f in _flagEntries)
             f.CheckBox.IsEnabled = true;
         _btnRegEdit!.Visibility = Visibility.Collapsed;
@@ -1815,6 +1826,7 @@ public partial class MainWindow : Window
         var values = new List<EmfeRegValue>();
         foreach (var entry in _regEntries)
         {
+            if (entry.ReadOnly) continue;  // synthetic / view registers (e.g. mc6809 D)
             var v = new EmfeRegValue { reg_id = entry.RegId };
             try
             {
