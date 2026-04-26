@@ -184,7 +184,8 @@
 
             <!-- Right: Register Panel (spans full height) -->
             <Border Grid.Column="1" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" Margin="2">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
                     <StackPanel x:Name="RegisterPanel" Margin="4"/>
                 </ScrollViewer>
             </Border>
