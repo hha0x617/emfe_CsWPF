@@ -764,10 +764,16 @@ public partial class MainWindow : Window
 
             if (regs.Count >= 4 && flagsReg.Def.name == IntPtr.Zero)
             {
-                // Multi-register group — use 2-column grid
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                // Multi-register group — use 2-column grid. Auto-sized
+                // columns + Left alignment so a row only takes (label
+                // + textbox) width per column. Star widths previously
+                // inherited the parent ScrollViewer's width, which once
+                // the horizontal scrollbar was enabled could be far
+                // wider than needed and stretched the 2-column register
+                // grid.
+                var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Left };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 int rows = (regs.Count + 1) / 2;
                 for (int r = 0; r < rows; r++)
                     grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
