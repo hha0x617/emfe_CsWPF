@@ -816,22 +816,15 @@ public partial class MainWindow : Window
                                 {
                                     Content = bitDef.Label,
                                     IsThreeState = false,
-                                    IsEnabled = !readOnly,
+                                    // Start disabled — only the Edit button
+                                    // unlocks editing. Mirrors how the value
+                                    // textboxes start IsReadOnly = true.
+                                    IsEnabled = false,
                                     Margin = new Thickness(0, 0, 8, 0),
                                     VerticalAlignment = VerticalAlignment.Center
                                 };
                                 chk.SetResourceReference(CheckBox.ForegroundProperty, "ThemeForeground");
-                                chk.Click += (s, e) =>
-                                {
-                                    if (_plugin.emfe_get_state(_instance) == EmfeState.Running) return;
-                                    var rv = new EmfeRegValue[] { new() { reg_id = regId } };
-                                    _plugin.emfe_get_registers(_instance, rv, 1);
-                                    ulong mask = 1UL << bitIndex;
-                                    if (chk.IsChecked == true) rv[0].u64 |= mask;
-                                    else                       rv[0].u64 &= ~mask;
-                                    _plugin.emfe_set_registers(_instance, rv, 1);
-                                    UpdateRegisters();
-                                };
+                                _ = readOnly; // reserved for future per-register read-only handling
                                 flagRow.Children.Add(chk);
                                 _flagEntries.Add(new FlagCheckEntry(regId, bitIndex, chk));
                             }
@@ -1748,6 +1741,8 @@ public partial class MainWindow : Window
     {
         foreach (var entry in _regEntries)
             entry.ValueBox.IsReadOnly = false;
+        foreach (var f in _flagEntries)
+            f.CheckBox.IsEnabled = true;
         _btnRegEdit!.Visibility = Visibility.Collapsed;
         _btnRegApply!.Visibility = Visibility.Visible;
         _btnRegCancel!.Visibility = Visibility.Visible;
@@ -1772,11 +1767,40 @@ public partial class MainWindow : Window
             catch { }
         }
 
+        // Build flag-register values from the checkbox states. Group by
+        // RegId so a single read-modify-write writes all bits at once;
+        // any matching textbox edit in `values` is superseded by the
+        // flag write (last-write-wins, but in practice the user toggles
+        // either textbox or flags, not both).
+        if (_flagEntries.Count > 0)
+        {
+            var flagRegIds = _flagEntries.Select(f => f.RegId).Distinct().ToList();
+            foreach (var regId in flagRegIds)
+            {
+                var rv = new EmfeRegValue[] { new() { reg_id = regId } };
+                _plugin.emfe_get_registers(_instance, rv, 1);
+                ulong v = rv[0].u64;
+                foreach (var f in _flagEntries)
+                {
+                    if (f.RegId != regId) continue;
+                    ulong mask = 1UL << f.BitIndex;
+                    if (f.CheckBox.IsChecked == true) v |= mask;
+                    else                              v &= ~mask;
+                }
+                rv[0].u64 = v;
+                int idx = values.FindIndex(x => x.reg_id == regId);
+                if (idx >= 0) values[idx] = rv[0];
+                else          values.Add(rv[0]);
+            }
+        }
+
         if (values.Count > 0)
             _plugin.emfe_set_registers(_instance, values.ToArray(), values.Count);
 
         foreach (var entry in _regEntries)
             entry.ValueBox.IsReadOnly = true;
+        foreach (var f in _flagEntries)
+            f.CheckBox.IsEnabled = false;
         _btnRegEdit!.Visibility = Visibility.Visible;
         _btnRegApply!.Visibility = Visibility.Collapsed;
         _btnRegCancel!.Visibility = Visibility.Collapsed;
@@ -1789,6 +1813,8 @@ public partial class MainWindow : Window
     {
         foreach (var entry in _regEntries)
             entry.ValueBox.IsReadOnly = true;
+        foreach (var f in _flagEntries)
+            f.CheckBox.IsEnabled = false;
         _btnRegEdit!.Visibility = Visibility.Visible;
         _btnRegApply!.Visibility = Visibility.Collapsed;
         _btnRegCancel!.Visibility = Visibility.Collapsed;
