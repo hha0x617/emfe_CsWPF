@@ -216,13 +216,38 @@ public partial class MainWindow : Window
     // Plugin loading
     // ========================================================================
 
-    // Scan the plugins\ subdirectory next to the exe for emfe_plugin_*.dll.
+    // Per-user plugin directory. Co-located with the per-user
+    // appsettings.json so the install dir can stay read-only (typical
+    // when emfe is installed under C:\Program Files\).
+    private static string GetUserPluginsDir()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return System.IO.Path.Combine(localAppData, "emfe_CsWPF", "plugins");
+    }
+
+    // Scan two roots for emfe_plugin_*.dll:
+    //   1. <emfe.exe>\plugins\                       (system / installer-shipped, often r/o)
+    //   2. %LOCALAPPDATA%\emfe_CsWPF\plugins\        (per-user, always writable)
+    // The user dir wins on filename collisions so a downloaded plugin
+    // can override a stale system copy without admin rights.
     private static string[] ScanPlugins()
     {
-        var pluginsDir = System.IO.Path.Combine(AppContext.BaseDirectory, "plugins");
-        if (!System.IO.Directory.Exists(pluginsDir))
-            return Array.Empty<string>();
-        var files = System.IO.Directory.GetFiles(pluginsDir, "emfe_plugin_*.dll");
+        var systemDir = System.IO.Path.Combine(AppContext.BaseDirectory, "plugins");
+        var userDir = GetUserPluginsDir();
+
+        // filename -> full path. Reinsert from the user dir overwrites
+        // the system entry for the same file.
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void Scan(string dir)
+        {
+            if (string.IsNullOrEmpty(dir) || !System.IO.Directory.Exists(dir)) return;
+            foreach (var path in System.IO.Directory.GetFiles(dir, "emfe_plugin_*.dll"))
+                byName[System.IO.Path.GetFileName(path)] = path;
+        }
+        Scan(systemDir);
+        Scan(userDir);
+
+        var files = byName.Values.ToArray();
         Array.Sort(files, StringComparer.OrdinalIgnoreCase);
         return files;
     }
@@ -342,7 +367,7 @@ public partial class MainWindow : Window
         var pluginFiles = ScanPlugins();
         if (pluginFiles.Length == 0)
         {
-            StatusText.Text = "No plugin DLLs found in plugins\\ directory";
+            StatusText.Text = "No plugin DLLs found in plugins\\ or %LOCALAPPDATA%\\emfe_CsWPF\\plugins\\";
             return;
         }
         var displayNames = BuildPluginDisplayNames(pluginFiles);
@@ -374,7 +399,7 @@ public partial class MainWindow : Window
         var pluginFiles = ScanPlugins();
         if (pluginFiles.Length == 0)
         {
-            StatusText.Text = "No plugin DLLs found — place emfe_plugin_*.dll in the plugins\\ directory next to emfe.exe";
+            StatusText.Text = "No plugin DLLs found — place emfe_plugin_*.dll in either the plugins\\ directory next to emfe.exe or %LOCALAPPDATA%\\emfe_CsWPF\\plugins\\";
             return;
         }
 
