@@ -131,6 +131,12 @@ way and will show up in the Switch Plugin dialog.
 - [emfe_plugins/mc6809](https://github.com/hha0x617/emfe_plugins/tree/master/mc6809) — Motorola MC6809 plugin (Rust)
 - [emfe_WinUI3Cpp](https://github.com/hha0x617/emfe_WinUI3Cpp) — C++ WinUI 3 front-end (feature-parity)
 
+## Contributing and Policies
+
+- Contribution workflow: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Code of Conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1)
+- Security: [`SECURITY.md`](SECURITY.md)
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
