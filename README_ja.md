@@ -10,6 +10,8 @@ emfe プラグインアーキテクチャの **C# WPF** フロントエンド。
 
 [emfe_plugin_mc68030](https://github.com/hha0x617/emfe_plugins/tree/master/mc68030) のようなプラグイン DLL を P/Invoke で動的ロードし、レジスタ・逆アセンブリ・メモリダンプ・コンソールを表示します。
 
+*[Claude Code](https://docs.anthropic.com/en/docs/claude-code) との vibe coding で開発しています。*
+
 ## 機能
 
 - em68030 互換レイアウト ([emfe_WinUI3Cpp](../emfe_WinUI3Cpp/) と同等)
