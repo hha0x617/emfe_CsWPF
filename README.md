@@ -13,6 +13,9 @@ The host dynamically loads plugin DLLs such as
 via P/Invoke and surfaces a register panel, disassembly view, memory dump,
 and console window.
 
+*Developed through vibe coding with
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code).*
+
 ## Features
 
 - Em68030-style layout (parity with [emfe_WinUI3Cpp](https://github.com/hha0x617/emfe_WinUI3Cpp))
