@@ -109,7 +109,9 @@ public partial class FramebufferWindow : Window
         }
 
         StatusText.Text = $"{width}x{height} {info.bpp}bpp  ${info.base_address:X8}  {_currentFps:F1} fps";
-        InputStatusText.Text = _inputCaptured ? "Input: captured (Esc to release)" : "Click framebuffer to capture input";
+        InputStatusText.Text = _inputCaptured
+            ? "Keyboard: captured (Esc to release)"
+            : "Click framebuffer to capture keyboard";
     }
 
     private void ConvertToBgra32(EmfeFramebufferInfo info, byte[] dst, int dstStride)
@@ -217,19 +219,34 @@ public partial class FramebufferWindow : Window
     // Input capture
     // ========================================================================
 
+    // Mouse moves and clicks always flow to the guest when the cursor is over
+    // FbGrid — the standalone em68030_WinUI3Cpp does the same, and the prior
+    // capture-gate dropped every MouseMove before the first click, so X never
+    // saw cursor motion.
+    //
+    // _inputCaptured still controls KEYBOARD forwarding so the user can press
+    // Esc to release without the guest swallowing it, and acts as the
+    // "hide host cursor + take focus" trigger on first click.
+    //
+    // Button codes are Linux BTN_LEFT/RIGHT/MIDDLE so the guest's em68030input
+    // driver passes them via input_report_key() — the previous 0/1/2 codes
+    // failed the kbit lookup on tablet_dev/mouse_dev and were silently dropped.
+
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
         if (!_inputCaptured) return;
         if (e.Key == Key.Escape) { ReleaseInput(); e.Handled = true; return; }
-        uint sc = WpfKeyToScancode(e);
-        if (sc != 0) { _plugin.emfe_push_key(_instance, sc, true); e.Handled = true; }
+        // MapVirtualKey(VK_TO_VSC) returns a PS/2 set-1 scan code; the guest
+        // em68030input driver expects Linux KEY_* codes instead.
+        ushort code = WpfKeyToLinuxKey(e);
+        if (code != 0) { _plugin.emfe_push_key(_instance, code, true); e.Handled = true; }
     }
 
     private void OnKeyUp(object sender, KeyEventArgs e)
     {
         if (!_inputCaptured) return;
-        uint sc = WpfKeyToScancode(e);
-        if (sc != 0) { _plugin.emfe_push_key(_instance, sc, false); e.Handled = true; }
+        ushort code = WpfKeyToLinuxKey(e);
+        if (code != 0) { _plugin.emfe_push_key(_instance, code, false); e.Handled = true; }
     }
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
@@ -237,40 +254,33 @@ public partial class FramebufferWindow : Window
         if (!_inputCaptured)
         {
             CaptureInput();
-            e.Handled = true;
-            return;
         }
-        int btn = e.ChangedButton switch
-        {
-            MouseButton.Left => 0,
-            MouseButton.Right => 1,
-            MouseButton.Middle => 2,
-            _ => -1
-        };
+        int btn = MouseButtonToLinuxBtn(e.ChangedButton);
         if (btn >= 0) _plugin.emfe_push_mouse_button(_instance, btn, true);
         e.Handled = true;
     }
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_inputCaptured) return;
-        int btn = e.ChangedButton switch
-        {
-            MouseButton.Left => 0,
-            MouseButton.Right => 1,
-            MouseButton.Middle => 2,
-            _ => -1
-        };
+        int btn = MouseButtonToLinuxBtn(e.ChangedButton);
         if (btn >= 0) _plugin.emfe_push_mouse_button(_instance, btn, false);
         e.Handled = true;
     }
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_inputCaptured || _lastWidth == 0 || _lastHeight == 0) return;
+        if (_lastWidth == 0 || _lastHeight == 0) return;
         var (x, y) = MapMouseToFramebuffer(e.GetPosition(FbGrid));
         _plugin.emfe_push_mouse_absolute(_instance, x, y);
     }
+
+    private static int MouseButtonToLinuxBtn(MouseButton b) => b switch
+    {
+        MouseButton.Left   => KeyMapping.LINUX_BTN_LEFT,
+        MouseButton.Right  => KeyMapping.LINUX_BTN_RIGHT,
+        MouseButton.Middle => KeyMapping.LINUX_BTN_MIDDLE,
+        _ => -1
+    };
 
     private (int x, int y) MapMouseToFramebuffer(Point pos)
     {
@@ -313,17 +323,9 @@ public partial class FramebufferWindow : Window
         FbGrid.Cursor = Cursors.Cross;
     }
 
-    private static uint WpfKeyToScancode(KeyEventArgs e)
+    private static ushort WpfKeyToLinuxKey(KeyEventArgs e)
     {
         int vk = KeyInterop.VirtualKeyFromKey(e.Key == Key.System ? e.SystemKey : e.Key);
-        return MapVirtualKeyToScancode((uint)vk);
-    }
-
-    [DllImport("user32.dll")]
-    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
-
-    private static uint MapVirtualKeyToScancode(uint vk)
-    {
-        return MapVirtualKey(vk, 0); // MAPVK_VK_TO_VSC
+        return KeyMapping.WindowsVkToLinuxKey(vk);
     }
 }
