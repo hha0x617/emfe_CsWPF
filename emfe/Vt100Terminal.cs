@@ -75,6 +75,11 @@ public class Vt100Terminal
     // OSC / DCS / PM / APC string sequence state
     private bool _stringSeqEsc;
 
+    // UTF-8 decoder state: accumulates multibyte sequences across Write(char) calls.
+    // Mirrors Em68030_CsWPF/Em68030/Views/Vt100Terminal.cs.
+    private int _utf8Remaining;
+    private int _utf8CodePoint;
+
     // Line drawing character map (ASCII -> ASCII approximation)
     private static readonly Dictionary<char, char> LineDrawingMap = new()
     {
@@ -132,6 +137,50 @@ public class Vt100Terminal
 
     public void Write(char ch)
     {
+        // UTF-8 decode: the caller passes raw bytes as char values.
+        // Multibyte sequences (0x80+) need to be accumulated and decoded so
+        // that a single ─ (U+2500, 3 bytes) occupies one cell instead of
+        // three, and so that continuation bytes aren't dropped by the
+        // `ch >= ' '` filter in ProcessNormal.  Mirrors the C# port in
+        // Em68030_CsWPF/Em68030/Views/Vt100Terminal.cs:Write.
+        int b = ch & 0xFF;
+        if (_utf8Remaining > 0)
+        {
+            if ((b & 0xC0) == 0x80)
+            {
+                _utf8CodePoint = (_utf8CodePoint << 6) | (b & 0x3F);
+                _utf8Remaining--;
+                if (_utf8Remaining == 0)
+                    ch = _utf8CodePoint <= 0xFFFF ? (char)_utf8CodePoint : '?';
+                else
+                    return;
+            }
+            else
+            {
+                // Invalid continuation byte: abandon the in-progress sequence
+                // and reparse this byte from scratch as if it were fresh.
+                _utf8Remaining = 0;
+            }
+        }
+        else if (b >= 0xC0 && b <= 0xDF) // 2-byte sequence start
+        {
+            _utf8CodePoint = b & 0x1F;
+            _utf8Remaining = 1;
+            return;
+        }
+        else if (b >= 0xE0 && b <= 0xEF) // 3-byte sequence start
+        {
+            _utf8CodePoint = b & 0x0F;
+            _utf8Remaining = 2;
+            return;
+        }
+        else if (b >= 0xF0 && b <= 0xF7) // 4-byte sequence start
+        {
+            _utf8CodePoint = b & 0x07;
+            _utf8Remaining = 3;
+            return;
+        }
+
         switch (_state)
         {
             case State.Normal:
@@ -731,6 +780,8 @@ public class Vt100Terminal
         _scrollBottom = _rows - 1;
         _alternateCharset = false;
         _state = State.Normal;
+        _utf8Remaining = 0;
+        _utf8CodePoint = 0;
         _dirty = true;
     }
 }
