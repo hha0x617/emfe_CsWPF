@@ -249,6 +249,20 @@ public partial class ConsoleWindow : Window
             return;
         }
 
+        // Ctrl+Shift+C / V / A → host clipboard actions.  Runs BEFORE the
+        // plain Ctrl+letter path below so that the Shift fork wins; the
+        // un-shifted form keeps sending the control byte to the guest
+        // (Ctrl+C = SIGINT, Ctrl+V = readline quoted-insert, Ctrl+A =
+        // beginning-of-line).  Mirrors the Ctrl+Shift+C/V convention used
+        // by Windows Terminal, gnome-terminal, Konsole and VS Code.
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+            && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            if (e.Key == Key.C) { OnConsoleMenuCopy(this, new RoutedEventArgs());      e.Handled = true; return; }
+            if (e.Key == Key.V) { OnConsoleMenuPaste(this, new RoutedEventArgs());     e.Handled = true; return; }
+            if (e.Key == Key.A) { OnConsoleMenuSelectAll(this, new RoutedEventArgs()); e.Handled = true; return; }
+        }
+
         if (_sendChar == null) return;
 
         // Special keys that PreviewTextInput wouldn't produce (or would
