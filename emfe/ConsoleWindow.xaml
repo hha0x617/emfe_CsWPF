@@ -20,14 +20,14 @@
             <TextBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem x:Name="ConsoleMenuCopy"
-                              Header="Copy (Ctrl+C)"
+                              Header="Copy (Ctrl+Shift+C)"
                               Click="OnConsoleMenuCopy"/>
                     <MenuItem x:Name="ConsoleMenuPaste"
-                              Header="Paste"
+                              Header="Paste (Ctrl+Shift+V)"
                               Click="OnConsoleMenuPaste"/>
                     <Separator/>
                     <MenuItem x:Name="ConsoleMenuSelectAll"
-                              Header="Select All (Ctrl+A)"
+                              Header="Select All (Ctrl+Shift+A)"
                               Click="OnConsoleMenuSelectAll"/>
                 </ContextMenu>
             </TextBox.ContextMenu>
