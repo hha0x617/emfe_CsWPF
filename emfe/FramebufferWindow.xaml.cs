@@ -18,6 +18,10 @@ public partial class FramebufferWindow : Window
     private uint _lastWidth, _lastHeight, _lastBpp;
     private uint[]? _palette;
     private bool _inputCaptured;
+    // True once the window has been resized to match the first observed
+    // framebuffer dimensions (dot-by-dot client area).  One-shot: the user can
+    // still resize the window manually afterwards.
+    private bool _initialSizeApplied;
 
     // FPS tracking
     private readonly Stopwatch _fpsWatch = new();
@@ -34,7 +38,11 @@ public partial class FramebufferWindow : Window
             ThemeHelper.ApplyTitleBar(this, ThemeHelper.IsDarkMode);
             StartTimer();
         };
-        Closed += (_, _) => StopTimer();
+        Closed += (_, _) =>
+        {
+            StopTimer();
+            _initialSizeApplied = false;
+        };
     }
 
     private void StartTimer()
@@ -87,6 +95,23 @@ public partial class FramebufferWindow : Window
             {
                 _palette = null;
             }
+        }
+
+        // Resize the window so the image renders dot-by-dot (client area in
+        // DIPs matches the bitmap's native size — which is the framebuffer's
+        // pixel dimensions because the bitmap is created at 96 DPI).  Done
+        // once on the first valid frame; subsequent user-driven resizes are
+        // respected.  Reset by the Closed handler so a re-open re-fits.
+        if (!_initialSizeApplied && _lastWidth > 0 && _lastHeight > 0)
+        {
+            _initialSizeApplied = true;
+            // WPF reports the non-client (chrome) thickness of the standard
+            // window frame.  Client size + this thickness == outer Width/Height.
+            var nonClient = SystemParameters.WindowNonClientFrameThickness;
+            // Status bar height in DIPs (matches XAML: Padding 8,4 + 12pt font).
+            const double statusBarDip = 28.0;
+            Width  = _lastWidth + nonClient.Left + nonClient.Right;
+            Height = _lastHeight + statusBarDip + nonClient.Top + nonClient.Bottom;
         }
 
         int width = (int)info.width;
