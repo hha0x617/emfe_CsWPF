@@ -8,7 +8,7 @@
 
 emfe プラグインアーキテクチャの **C# WPF** フロントエンド。
 
-[emfe_plugin_mc68030](https://github.com/hha0x617/emfe_plugins/tree/master/mc68030) のようなプラグイン DLL を P/Invoke で動的ロードし、レジスタ・逆アセンブリ・メモリダンプ・コンソールを表示します。
+[emfe_plugin_mc68030](https://github.com/hha0x617/emfe_plugins/tree/master/mc68030) のようなプラグイン DLL を P/Invoke で動的ロードし、レジスタ・逆アセンブリ・メモリダンプ・シリアルコンソールを表示します。
 
 *[Claude Code](https://docs.anthropic.com/en/docs/claude-code) との vibe coding で開発しています。*
 
@@ -19,7 +19,7 @@ emfe プラグインアーキテクチャの **C# WPF** フロントエンド。
 - 逆アセンブリ: PC行背景ハイライト + ブレークポイントインジケータ
 - メモリダンプ: TextBox 形式 (WPF) + 編集モード
 - 実行制御: Step (F10), Step Over (F11), Step Out (Shift+F11), Run (F5), Stop (Shift+F5), Reset, Full Reset
-- コンソールウィンドウ: 別ウィンドウ、緑/黒配色、自動表示、キー入力
+- シリアルコンソールウィンドウ: 別ウィンドウ、緑/黒配色、自動表示、キー入力
 - 設定ダイアログ: プラグインから取得した setting defs を動的 UI 化
 
 ## ディレクトリ構造
@@ -101,7 +101,7 @@ Switch Plugin ダイアログから選択できる。
 
 1. `emfe.exe` を実行
 2. **File → Open ELF...** (Ctrl+E) または **Open S-Record...** (Ctrl+S) でプログラムをロード
-3. **View → Console** でコンソールウィンドウを開く
+3. **View → Serial Console** でシリアルコンソールウィンドウを開く
 4. **Run (F5)** / **Step (F10)** で実行
 5. **逆アセンブリ行のダブルクリック** でブレークポイントをトグル
 6. **Settings → Emulator Settings...** で設定ダイアログを開く

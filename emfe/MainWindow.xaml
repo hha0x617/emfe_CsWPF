@@ -58,10 +58,10 @@
                 <MenuItem Header="_Full Reset" Click="OnFullReset"/>
             </MenuItem>
             <MenuItem Header="_View">
-                <MenuItem Header="_Console" Click="OnToggleConsole"/>
+                <MenuItem Header="Serial _Console" Click="OnToggleConsole"/>
+                <MenuItem x:Name="MenuFramebuffer" Header="_Framebuffer..." Click="OnOpenFramebuffer"/>
                 <MenuItem Header="_Breakpoints..." Click="OnOpenBreakpoints"/>
                 <MenuItem x:Name="MenuCallStack" Header="Call _Stack..." Click="OnOpenCallStack"/>
-                <MenuItem x:Name="MenuFramebuffer" Header="_Framebuffer..." Click="OnOpenFramebuffer"/>
             </MenuItem>
             <MenuItem Header="_Settings">
                 <MenuItem Header="_Emulator Settings..." Click="OnOpenSettings"/>
