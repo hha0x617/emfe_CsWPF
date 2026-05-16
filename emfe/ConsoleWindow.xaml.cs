@@ -271,7 +271,16 @@ public partial class ConsoleWindow : Window
         // through OnTextInput below.
         char ch = '\0';
         if (e.Key == Key.Enter) ch = '\n';
-        else if (e.Key == Key.Back) ch = '\b';
+        // Backspace key → DEL (0x7F), not BS (0x08).  Modern Linux/BSD ttys
+        // (agetty's login prompt, vi insert mode, etc.) take their erase
+        // character from termios `VERASE`, which defaults to DEL.  bash +
+        // readline binds both 0x7F and 0x08 to backward-delete-char so the
+        // shell prompt works either way, but agetty does not, and would
+        // otherwise echo the BS byte as literal "^H".  Ctrl+H still sends
+        // 0x08 via the Ctrl+letter path below for users who specifically
+        // need BS.  Mirrors the WinUI3 frontend; matches the standalone
+        // em68030's behaviour.
+        else if (e.Key == Key.Back) ch = (char)0x7F;
         else if (e.Key == Key.Escape) ch = (char)0x1B;
         else if (e.Key == Key.Tab) ch = '\t';
         else if (e.Key == Key.Space) ch = ' ';  // PreviewTextInput is unreliable for Space on TextBox
