@@ -261,10 +261,48 @@ public partial class FramebufferWindow : Window
     {
         if (!_inputCaptured) return;
         if (e.Key == Key.Escape) { ReleaseInput(); e.Handled = true; return; }
+        // Ctrl+Shift+V: paste clipboard text as synthetic key events.  Must
+        // come before the normal VK→KEY dispatch so V is not also forwarded.
+        if (e.Key == Key.V && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            DoFramebufferPaste();
+            e.Handled = true;
+            return;
+        }
         // MapVirtualKey(VK_TO_VSC) returns a PS/2 set-1 scan code; the guest
         // em68030input driver expects Linux KEY_* codes instead.
         ushort code = WpfKeyToLinuxKey(e);
         if (code != 0) { _plugin.emfe_push_key(_instance, code, true); e.Handled = true; }
+    }
+
+    // Paste the host clipboard into the guest as synthetic key events.  Mirrors
+    // emfe_WinUI3Cpp::DoFramebufferPaste and matches em68030_CsWPF's
+    // InputDevice.PushTextInput — the modifiers physically held by the user
+    // are released in the guest first so each pasted char isn't modified.
+    private void DoFramebufferPaste()
+    {
+        if (_instance == IntPtr.Zero) return;
+        if (!Clipboard.ContainsText()) return;
+        string text = Clipboard.GetText();
+        if (string.IsNullOrEmpty(text)) return;
+
+        const ushort KEY_LEFTSHIFT = 42;
+        const ushort KEY_LEFTCTRL  = 29;
+        _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, false);
+        _plugin.emfe_push_key(_instance, KEY_LEFTCTRL,  false);
+
+        foreach (char ch in text)
+        {
+            // '\n' alone produces KEY_ENTER, so skip CR in CRLF.
+            if (ch == '\r') continue;
+            if (ch > 0x7F) continue;  // non-ASCII silently dropped
+            var (keyCode, needShift) = KeyMapping.CharToLinuxKey(ch);
+            if (keyCode == 0) continue;
+            if (needShift) _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, true);
+            _plugin.emfe_push_key(_instance, keyCode, true);
+            _plugin.emfe_push_key(_instance, keyCode, false);
+            if (needShift) _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, false);
+        }
     }
 
     private void OnKeyUp(object sender, KeyEventArgs e)
