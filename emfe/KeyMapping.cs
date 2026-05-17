@@ -15,6 +15,8 @@
 // utility because Windows VK_* is host-specific and does not belong in the
 // OS-neutral plugin C ABI in external/emfe_plugins/api/.
 
+using System;
+
 namespace emfe;
 
 internal static class KeyMapping
@@ -153,4 +155,93 @@ internal static class KeyMapping
 
         _ => 0,
     };
+
+    /// <summary>
+    /// Maps an ASCII character to a plugin-input scancode and whether Shift is
+    /// needed.  Returns (0, false) if unmapped.  US layout assumed.
+    /// </summary>
+    /// <remarks>
+    /// The scancode value is a Linux input-event KEY_* code — that is the
+    /// wire format the emfe plugin's input MMIO FIFO uses; it is NOT a
+    /// statement about the guest OS.  Linux guests consume it directly via
+    /// <c>input_report_key</c>; NetBSD guests (Em68030-Guest-NetBSD) translate
+    /// the same value to AT Set 1 in the em68030kbd wscons driver.
+    /// </remarks>
+    public static (ushort scancode, bool needShift) CharToScancode(char ch)
+    {
+        // Letters
+        if (ch >= 'a' && ch <= 'z')
+        {
+            ReadOnlySpan<ushort> map = stackalloc ushort[]
+            {
+                30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44
+            };
+            return (map[ch - 'a'], false);
+        }
+        if (ch >= 'A' && ch <= 'Z')
+        {
+            ReadOnlySpan<ushort> map = stackalloc ushort[]
+            {
+                30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44
+            };
+            return (map[ch - 'A'], true);
+        }
+
+        switch (ch)
+        {
+            case '0': return (11, false);
+            case '1': return (2,  false);
+            case '2': return (3,  false);
+            case '3': return (4,  false);
+            case '4': return (5,  false);
+            case '5': return (6,  false);
+            case '6': return (7,  false);
+            case '7': return (8,  false);
+            case '8': return (9,  false);
+            case '9': return (10, false);
+
+            // Unshifted punctuation (US layout)
+            case '-':  return (12, false);
+            case '=':  return (13, false);
+            case '[':  return (26, false);
+            case ']':  return (27, false);
+            case '\\': return (43, false);
+            case ';':  return (39, false);
+            case '\'': return (40, false);
+            case '`':  return (41, false);
+            case ',':  return (51, false);
+            case '.':  return (52, false);
+            case '/':  return (53, false);
+
+            // Shifted punctuation
+            case '!': return (2,  true);
+            case '@': return (3,  true);
+            case '#': return (4,  true);
+            case '$': return (5,  true);
+            case '%': return (6,  true);
+            case '^': return (7,  true);
+            case '&': return (8,  true);
+            case '*': return (9,  true);
+            case '(': return (10, true);
+            case ')': return (11, true);
+            case '_': return (12, true);
+            case '+': return (13, true);
+            case '{': return (26, true);
+            case '}': return (27, true);
+            case '|': return (43, true);
+            case ':': return (39, true);
+            case '"': return (40, true);
+            case '~': return (41, true);
+            case '<': return (51, true);
+            case '>': return (52, true);
+            case '?': return (53, true);
+
+            // Whitespace / control
+            case ' ':  return (57, false);  // KEY_SPACE
+            case '\n': return (28, false);  // KEY_ENTER
+            case '\t': return (15, false);  // KEY_TAB
+
+            default: return (0, false);
+        }
+    }
 }
