@@ -18,6 +18,12 @@ public partial class FramebufferWindow : Window
     private uint _lastWidth, _lastHeight, _lastBpp;
     private uint[]? _palette;
     private bool _inputCaptured;
+    // Reusable scratch buffers so we don't allocate ~hundreds of KB per
+    // frame (heap churn was contributing to the framebuffer running at
+    // ~20 FPS against a 30 Hz target).  Resized only when dimensions/bpp
+    // change, in lock-step with the WriteableBitmap.
+    private byte[] _srcScratch = Array.Empty<byte>();   // VRAM mirror (managed copy)
+    private byte[] _dstScratch = Array.Empty<byte>();   // BGRA32 output
     // True once the window has been resized to match the first observed
     // framebuffer dimensions (dot-by-dot client area).  One-shot: the user can
     // still resize the window manually afterwards.
@@ -78,7 +84,9 @@ public partial class FramebufferWindow : Window
 
         DisabledText.Visibility = Visibility.Collapsed;
 
-        // Recreate bitmap if format/size changed
+        // Recreate bitmap (and resize scratch buffers in lock-step) if
+        // format/size changed.  The scratches are deliberately kept alive
+        // between frames so we don't churn the heap on every refresh.
         if (_bitmap == null || _lastWidth != info.width || _lastHeight != info.height || _lastBpp != info.bpp)
         {
             _bitmap = new WriteableBitmap((int)info.width, (int)info.height, 96, 96, PixelFormats.Bgra32, null);
@@ -86,6 +94,8 @@ public partial class FramebufferWindow : Window
             _lastWidth = info.width;
             _lastHeight = info.height;
             _lastBpp = info.bpp;
+            _srcScratch = new byte[(int)info.stride * (int)info.height];
+            _dstScratch = new byte[(int)info.width * (int)info.height * 4];
             if ((EmfeFramebufferFormat)info.bpp == EmfeFramebufferFormat.Indexed8)
             {
                 _palette = new uint[256];
@@ -118,11 +128,10 @@ public partial class FramebufferWindow : Window
         int height = (int)info.height;
         int srcStride = (int)info.stride;
         int dstStride = width * 4;
-        var dst = new byte[height * dstStride];
 
-        ConvertToBgra32(info, dst, dstStride);
+        ConvertToBgra32(info, _dstScratch, dstStride);
 
-        _bitmap.WritePixels(new Int32Rect(0, 0, width, height), dst, dstStride, 0);
+        _bitmap.WritePixels(new Int32Rect(0, 0, width, height), _dstScratch, dstStride, 0);
 
         // FPS calculation
         _frameCount++;
@@ -146,10 +155,12 @@ public partial class FramebufferWindow : Window
         int srcStride = (int)info.stride;
         var format = (EmfeFramebufferFormat)info.bpp;
 
-        // Read source pixels into managed buffer
+        // Marshal VRAM into the reusable managed scratch.  Resized in
+        // RefreshFrame() in lock-step with the WriteableBitmap, so its
+        // length always matches `srcStride * height`.
         int srcSize = srcStride * height;
-        var src = new byte[srcSize];
-        Marshal.Copy(info.pixels, src, 0, srcSize);
+        Marshal.Copy(info.pixels, _srcScratch, 0, srcSize);
+        byte[] src = _srcScratch;
 
         switch (format)
         {
