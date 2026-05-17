@@ -296,7 +296,7 @@ public partial class FramebufferWindow : Window
             // '\n' alone produces KEY_ENTER, so skip CR in CRLF.
             if (ch == '\r') continue;
             if (ch > 0x7F) continue;  // non-ASCII silently dropped
-            var (keyCode, needShift) = KeyMapping.CharToLinuxKey(ch);
+            var (keyCode, needShift) = KeyMapping.CharToScancode(ch);
             if (keyCode == 0) continue;
             if (needShift) _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, true);
             _plugin.emfe_push_key(_instance, keyCode, true);

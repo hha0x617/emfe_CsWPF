@@ -157,10 +157,17 @@ internal static class KeyMapping
     };
 
     /// <summary>
-    /// Maps an ASCII character to a Linux KEY_* code and whether Shift is needed.
-    /// Returns (0, false) if unmapped.  US layout assumed.
+    /// Maps an ASCII character to a plugin-input scancode and whether Shift is
+    /// needed.  Returns (0, false) if unmapped.  US layout assumed.
     /// </summary>
-    public static (ushort keyCode, bool needShift) CharToLinuxKey(char ch)
+    /// <remarks>
+    /// The scancode value is a Linux input-event KEY_* code — that is the
+    /// wire format the emfe plugin's input MMIO FIFO uses; it is NOT a
+    /// statement about the guest OS.  Linux guests consume it directly via
+    /// <c>input_report_key</c>; NetBSD guests (Em68030-Guest-NetBSD) translate
+    /// the same value to AT Set 1 in the em68030kbd wscons driver.
+    /// </remarks>
+    public static (ushort scancode, bool needShift) CharToScancode(char ch)
     {
         // Letters
         if (ch >= 'a' && ch <= 'z')
