@@ -731,7 +731,7 @@ public partial class MainWindow : Window
         _flagEntries.Clear();
         _viewRegEntries.Clear();
 
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
 
         // Get register definitions from plugin
         int regCount = _plugin.emfe_get_register_defs(_instance, out IntPtr defsPtr);
@@ -963,7 +963,7 @@ public partial class MainWindow : Window
 
     private void RegisterViewDepCapture(EmfeRegisterDef def)
     {
-        if (_plugin.emfe_get_register_view_deps == null) return;
+        if (_plugin == null || _plugin.emfe_get_register_view_deps == null) return;
         int nDeps = _plugin.emfe_get_register_view_deps(_instance, def.reg_id, out IntPtr depsPtr);
         if (nDeps <= 0 || depsPtr == IntPtr.Zero) return;
 
@@ -1012,7 +1012,7 @@ public partial class MainWindow : Window
 
     private void UpdateRegisters()
     {
-        if (_instance == IntPtr.Zero || _regEntries.Count == 0) return;
+        if (_instance == IntPtr.Zero || _plugin == null || _regEntries.Count == 0) return;
 
         var values = new EmfeRegValue[_regEntries.Count];
         for (int i = 0; i < _regEntries.Count; i++)
@@ -1068,7 +1068,7 @@ public partial class MainWindow : Window
 
     private void UpdateDisassembly()
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
 
         var pcVal = new EmfeRegValue[] { new() { reg_id = _pcRegId } };
         _plugin.emfe_get_registers(_instance, pcVal, 1);
@@ -1141,7 +1141,7 @@ public partial class MainWindow : Window
 
     private void ToggleBreakpoint(uint address)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_breakpointAddresses.TryGetValue(address, out bool enabled))
         {
             if (enabled)
@@ -1166,7 +1166,7 @@ public partial class MainWindow : Window
 
     public void SyncBreakpointCacheFromPlugin()
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _breakpointAddresses.Clear();
         var buf = new EmfeBreakpointInfo[128];
         int n = _plugin.emfe_get_breakpoints(_instance, buf, buf.Length);
@@ -1232,7 +1232,7 @@ public partial class MainWindow : Window
 
     private void OnDisasmMenuRunToHere(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_disasmMenuTargetIndex < 0 || _disasmMenuTargetIndex >= _disasmAddresses.Count) return;
 
         uint addr = _disasmAddresses[_disasmMenuTargetIndex];
@@ -1243,7 +1243,7 @@ public partial class MainWindow : Window
         // not in _tempBreakpoints.
         if (!_breakpointAddresses.ContainsKey(addr))
         {
-            if (_plugin!.emfe_add_breakpoint(_instance, addr) != EmfeResult.OK)
+            if (_plugin.emfe_add_breakpoint(_instance, addr) != EmfeResult.OK)
             {
                 StatusText.Text = $"Failed to add temporary breakpoint at ${addr:X8}";
                 return;
@@ -1252,7 +1252,7 @@ public partial class MainWindow : Window
         }
 
         ResetRunStatsBaseline();
-        _plugin!.emfe_run(_instance);
+        _plugin.emfe_run(_instance);
         UpdateToolbarState();
         string af = _addrDigits == 4 ? "X4" : "X8";
         StatusText.Text = $"Running to ${addr.ToString(af)}...";
@@ -1260,12 +1260,12 @@ public partial class MainWindow : Window
 
     private void OnDisasmMenuSetPc(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_disasmMenuTargetIndex < 0 || _disasmMenuTargetIndex >= _disasmAddresses.Count) return;
 
         uint addr = _disasmAddresses[_disasmMenuTargetIndex];
         var values = new[] { new EmfeRegValue { reg_id = _pcRegId, u64 = addr } };
-        if (_plugin!.emfe_set_registers(_instance, values, values.Length) != EmfeResult.OK)
+        if (_plugin.emfe_set_registers(_instance, values, values.Length) != EmfeResult.OK)
         {
             StatusText.Text = $"Failed to set PC to ${addr:X8}";
             return;
@@ -1321,7 +1321,7 @@ public partial class MainWindow : Window
     private void RefreshActiveWatchpoints()
     {
         _activeWatches.Clear();
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var buf = new EmfeWatchpointInfo[128];
         int n = _plugin.emfe_get_watchpoints(_instance, buf, buf.Length);
         for (int i = 0; i < n; i++)
@@ -1352,7 +1352,7 @@ public partial class MainWindow : Window
 
     private void UpdateMemoryDump(uint address)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _memoryAddress = address;
 
         int dumpSize = 256;
@@ -1655,7 +1655,7 @@ public partial class MainWindow : Window
 
     private void UpdateToolbarState()
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var state = _plugin.emfe_get_state(_instance);
         bool running = state == EmfeState.Running;
 
@@ -1695,7 +1695,7 @@ public partial class MainWindow : Window
 
     private void OnLoadElf(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var dlg = new OpenFileDialog { Filter = "All Files|*.*" };
         if (dlg.ShowDialog() != true) return;
 
@@ -1720,7 +1720,7 @@ public partial class MainWindow : Window
 
     private void OnLoadSrec(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var dlg = new OpenFileDialog { Filter = "S-Record Files (*.s19;*.srec)|*.s19;*.srec|All Files|*.*" };
         if (dlg.ShowDialog() != true) return;
 
@@ -1777,7 +1777,7 @@ public partial class MainWindow : Window
 
     private void OnStep(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var result = _plugin.emfe_step(_instance);
         if (result != EmfeResult.OK)
         {
@@ -1799,21 +1799,21 @@ public partial class MainWindow : Window
 
     private void OnStepOver(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _plugin.emfe_step_over(_instance);
         UpdateToolbarState();
     }
 
     private void OnStepOut(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _plugin.emfe_step_out(_instance);
         UpdateToolbarState();
     }
 
     private void OnRun(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         ResetRunStatsBaseline();
         _plugin.emfe_run(_instance);
         UpdateToolbarState();
@@ -1822,7 +1822,7 @@ public partial class MainWindow : Window
 
     private void OnStop(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _plugin.emfe_stop(_instance);
         UpdateRegisters();
         UpdateDisassembly();
@@ -1833,7 +1833,7 @@ public partial class MainWindow : Window
 
     private void OnReset(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         _plugin.emfe_reset(_instance);
         UpdateRegisters();
         UpdateDisassembly();
@@ -1885,6 +1885,7 @@ public partial class MainWindow : Window
 
     private void OnDisasmGo(object sender, RoutedEventArgs e)
     {
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (!uint.TryParse(DisasmAddrBox.Text, System.Globalization.NumberStyles.HexNumber, null, out uint addr))
             return;
 
@@ -1920,7 +1921,7 @@ public partial class MainWindow : Window
 
     private void OnRegApply(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
 
         var values = new List<EmfeRegValue>();
         foreach (var entry in _regEntries)
@@ -2007,7 +2008,7 @@ public partial class MainWindow : Window
 
     private void OnMemApply(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
 
         foreach (var c in _memCells)
         {
@@ -2062,7 +2063,7 @@ public partial class MainWindow : Window
         _consoleWindow = new ConsoleWindow(
             sendChar: ch =>
             {
-                if (_instance != IntPtr.Zero)
+                if (_instance != IntPtr.Zero && _plugin != null)
                     _plugin.emfe_send_char(_instance, (byte)ch);
             },
             queryTxSpace: () =>
@@ -2094,10 +2095,10 @@ public partial class MainWindow : Window
 
     private void OnOpenBreakpoints(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_breakpointsWindow == null)
         {
-            _breakpointsWindow = new BreakpointsWindow(_instance, _plugin!) { Owner = this };
+            _breakpointsWindow = new BreakpointsWindow(_instance, _plugin) { Owner = this };
             _breakpointsWindow.Closed += (_, _) => _breakpointsWindow = null;
             _breakpointsWindow.Show();
         }
@@ -2109,10 +2110,10 @@ public partial class MainWindow : Window
 
     private void OnOpenCallStack(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_callStackWindow == null)
         {
-            _callStackWindow = new CallStackWindow(_instance, _plugin!) { Owner = this };
+            _callStackWindow = new CallStackWindow(_instance, _plugin) { Owner = this };
             _callStackWindow.Closed += (_, _) => _callStackWindow = null;
             _callStackWindow.Show();
         }
@@ -2124,10 +2125,10 @@ public partial class MainWindow : Window
 
     private void OnOpenFramebuffer(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         if (_framebufferWindow == null)
         {
-            _framebufferWindow = new FramebufferWindow(_instance, _plugin!) { Owner = this };
+            _framebufferWindow = new FramebufferWindow(_instance, _plugin) { Owner = this };
             _framebufferWindow.Closed += (_, _) => _framebufferWindow = null;
             _framebufferWindow.Show();
         }
@@ -2150,7 +2151,7 @@ public partial class MainWindow : Window
             return;
         }
         // Address not in current view — re-center disassembly
-        if (_instance != IntPtr.Zero &&
+        if (_instance != IntPtr.Zero && _plugin != null &&
             _plugin.emfe_get_program_range(_instance, out ulong progStart, out _) == EmfeResult.OK
             && progStart > 0)
         {
@@ -2197,8 +2198,8 @@ public partial class MainWindow : Window
 
     private void OnOpenSettings(object sender, RoutedEventArgs e)
     {
-        if (_instance == IntPtr.Zero) return;
-        var dlg = new SettingsWindow(_instance, _plugin!) { Owner = this };
+        if (_instance == IntPtr.Zero || _plugin == null) return;
+        var dlg = new SettingsWindow(_instance, _plugin) { Owner = this };
         if (dlg.ShowDialog() == true)
         {
             ApplyThemeFromSettings();
@@ -2214,7 +2215,7 @@ public partial class MainWindow : Window
 
     private void ApplyThemeFromSettings()
     {
-        if (_instance == IntPtr.Zero) return;
+        if (_instance == IntPtr.Zero || _plugin == null) return;
         var themePtr = _plugin.emfe_get_setting(_instance, "Theme");
         var theme = Marshal.PtrToStringAnsi(themePtr) ?? "Dark";
         ApplyTheme(theme);
