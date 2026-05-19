@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -276,7 +277,7 @@ public partial class FramebufferWindow : Window
         // come before the normal VK→KEY dispatch so V is not also forwarded.
         if (e.Key == Key.V && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            DoFramebufferPaste();
+            _ = DoFramebufferPasteAsync();
             e.Handled = true;
             return;
         }
@@ -290,7 +291,25 @@ public partial class FramebufferWindow : Window
     // emfe_WinUI3Cpp::DoFramebufferPaste and matches em68030_CsWPF's
     // InputDevice.PushTextInput — the modifiers physically held by the user
     // are released in the guest first so each pasted char isn't modified.
-    private void DoFramebufferPaste()
+    //
+    // Batch throttle: without it, ~15+ chars (~30+ events pushed in
+    // microseconds) overflow the Linux evdev client-buffer (64 entries
+    // default), the kernel raises SYN_DROPPED, and X then discards the
+    // entire batch — zero characters reach the focused window.
+    //
+    // The buffer cap (64) is not the real limit in practice — under
+    // heavy renderers (vim in INSERT mode, xterm scrolling each line)
+    // X's event loop stalls for tens of milliseconds while it draws the
+    // previous character through the emulated framebuffer.  A generous
+    // batch (16 events) was empirically observed to still drop
+    // characters and newlines on long pastes into vim.
+    //
+    // We therefore push at most 4 events per 15 ms — ~270 events/sec —
+    // which is close to X's drain rate under heavy emulated load while
+    // still being noticeably faster than per-char 15 ms throttling.
+    // A 100-char paste finishes in roughly 1.1 s, a 500-char paste in
+    // roughly 5.6 s.
+    private async Task DoFramebufferPasteAsync()
     {
         if (_instance == IntPtr.Zero) return;
         if (!Clipboard.ContainsText()) return;
@@ -302,6 +321,10 @@ public partial class FramebufferWindow : Window
         _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, false);
         _plugin.emfe_push_key(_instance, KEY_LEFTCTRL,  false);
 
+        const int eventsPerBatch = 4;
+        const int batchSleepMs = 15;
+        int eventsSincePause = 2;  // the two release events above
+
         foreach (char ch in text)
         {
             // '\n' alone produces KEY_ENTER, so skip CR in CRLF.
@@ -309,10 +332,18 @@ public partial class FramebufferWindow : Window
             if (ch > 0x7F) continue;  // non-ASCII silently dropped
             var (keyCode, needShift) = KeyMapping.CharToScancode(ch);
             if (keyCode == 0) continue;
+            int eventsForChar = needShift ? 4 : 2;
             if (needShift) _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, true);
             _plugin.emfe_push_key(_instance, keyCode, true);
             _plugin.emfe_push_key(_instance, keyCode, false);
             if (needShift) _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, false);
+            eventsSincePause += eventsForChar;
+
+            if (eventsSincePause >= eventsPerBatch)
+            {
+                await Task.Delay(batchSleepMs);
+                eventsSincePause = 0;
+            }
         }
     }
 
