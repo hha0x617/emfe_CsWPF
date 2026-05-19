@@ -113,6 +113,35 @@ way and will show up in the Switch Plugin dialog.
 5. **Double-click a disassembly line** to toggle a breakpoint
 6. **Settings → Emulator Settings...** to open the settings dialog
 
+## Keyboard shortcuts
+
+### Serial Console window
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl+Shift+C** | Copy the current selection to the host clipboard |
+| **Ctrl+Shift+V** | Paste host clipboard text into the guest UART |
+| **Ctrl+Shift+A** | Select all |
+
+### Framebuffer window
+
+| Shortcut | Action |
+|----------|--------|
+| **Click**        | Capture host keyboard and hide the host cursor |
+| **Esc**          | Release captured input |
+| **Ctrl+Shift+V** | Paste host clipboard text as synthetic key events |
+
+Framebuffer paste sends Linux `KEY_*` scancodes that match a **US
+keyboard layout**.  The layer that converts scancodes into characters
+lives in the guest (kernel keymap at the Linux text console, `xkb`
+keymap in X11).  If the guest X session is configured for a non-US
+layout (e.g. JIS), characters will be substituted — Shift+9 will
+produce `)` instead of `(`, etc.  Workarounds are documented in the
+guest setup_framebuffer guide:
+
+- [Em68030-Guest-Linux setup_framebuffer.md](https://github.com/hha0x617/Em68030-Guest-Linux/blob/main/docs/setup_framebuffer.md)
+- [Em68030-Guest-NetBSD setup_framebuffer.md](https://github.com/hha0x617/Em68030-Guest-NetBSD/blob/main/docs/setup_framebuffer.md)
+
 ## P/Invoke pattern
 
 `PluginInterop.cs` declares every emfe API as P/Invoke.  Key type mappings:
