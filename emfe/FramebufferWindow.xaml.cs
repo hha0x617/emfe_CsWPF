@@ -297,11 +297,18 @@ public partial class FramebufferWindow : Window
     // default), the kernel raises SYN_DROPPED, and X then discards the
     // entire batch — zero characters reach the focused window.
     //
-    // We push events freely until ~16 events have accumulated, then await
-    // a 10 ms delay to let the guest drain the FIFO and X drain its evdev
-    // buffer.  16 is 1/4 of the 64-entry buffer so we never come close to
-    // overflow even when X is rendering slowly under emulation.  100-char
-    // paste finishes in ~190 ms.
+    // The buffer cap (64) is not the real limit in practice — under
+    // heavy renderers (vim in INSERT mode, xterm scrolling each line)
+    // X's event loop stalls for tens of milliseconds while it draws the
+    // previous character through the emulated framebuffer.  A generous
+    // batch (16 events) was empirically observed to still drop
+    // characters and newlines on long pastes into vim.
+    //
+    // We therefore push at most 4 events per 15 ms — ~270 events/sec —
+    // which is close to X's drain rate under heavy emulated load while
+    // still being noticeably faster than per-char 15 ms throttling.
+    // A 100-char paste finishes in roughly 1.1 s, a 500-char paste in
+    // roughly 5.6 s.
     private async Task DoFramebufferPasteAsync()
     {
         if (_instance == IntPtr.Zero) return;
@@ -314,7 +321,8 @@ public partial class FramebufferWindow : Window
         _plugin.emfe_push_key(_instance, KEY_LEFTSHIFT, false);
         _plugin.emfe_push_key(_instance, KEY_LEFTCTRL,  false);
 
-        const int eventsPerBatch = 16;
+        const int eventsPerBatch = 4;
+        const int batchSleepMs = 15;
         int eventsSincePause = 2;  // the two release events above
 
         foreach (char ch in text)
@@ -333,7 +341,7 @@ public partial class FramebufferWindow : Window
 
             if (eventsSincePause >= eventsPerBatch)
             {
-                await Task.Delay(10);
+                await Task.Delay(batchSleepMs);
                 eventsSincePause = 0;
             }
         }
